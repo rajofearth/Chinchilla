@@ -360,7 +360,7 @@ These are rough expected ranges for a d6 (6-layer, 384-dim) model. It is a small
 
 ## **ℹ  Context on scores** 
 
-The pretrain checkpoint d6 is ~28M parameters — about GPT-2 Small size. SFT teaches it to follow instructions but does not add knowledge it did not learn in pretraining. For better scores, train d20 (561M params) — but that needs 8xH100 and ~$73. 
+The pretrain checkpoint d6 is ~73.5M parameters — about GPT-2 Small size. SFT teaches it to follow instructions but does not add knowledge it did not learn in pretraining. For better scores, train d20 (561M params) — but that needs 8xH100 and ~$73. 
 
 ## **6. GPU Options on Modal** 
 

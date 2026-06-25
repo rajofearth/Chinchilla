@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-This project performs **Supervised Fine-Tuning (SFT)** of the [karpathy/nanochat](https://github.com/karpathy/nanochat) **d6** model (28M parameters, 6-layer, 384-dim) on **Modal** cloud GPUs. The base pretrain checkpoint is at **step 8600** from Kaggle pretraining (FineWeb-EDU data, 512 sequence length).
+This project performs **Supervised Fine-Tuning (SFT)** of the [karpathy/nanochat](https://github.com/karpathy/nanochat) **d6** model (73.5M parameters, 6-layer, 384-dim) on **Modal** cloud GPUs. The base pretrain checkpoint is at **step 8600** from Kaggle pretraining (FineWeb-EDU data, 512 sequence length).
 
 The goal: take a pretrained autoregressive language model and fine-tune it on a mixture of instruction-following datasets (SmolTalk, MMLU, GSM8K, spelling tasks) so it learns to follow user instructions in a chat format.
 
@@ -369,7 +369,7 @@ Response: (coherent paragraph-length chat response in the expected format)
 | Factual knowledge | ✗ Garbled — entities like Elon Musk produce confused output |
 | Pattern looping | ~ Sometimes repeats the same response format |
 
-**Interpretation:** This is expected behavior for a **d6 model (28M params)** with only **1 epoch of SFT**. The model is roughly 1/60th the size of GPT-2 (1.6B params). At this scale, instruction following is inherently limited — the model simply doesn't have enough parameters to represent complex reasoning or store many facts. The d26 model (~1.6B params) would perform significantly better.
+**Interpretation:** This is expected behavior for a **d6 model (73.5M params)** with only **1 epoch of SFT**. The model is roughly 1/22nd the size of GPT-2 (1.6B params). At this scale, instruction following is inherently limited — the model simply doesn't have enough parameters to represent complex reasoning or store many facts. The d26 model (~1.6B params) would perform significantly better.
 
 ---
 
@@ -504,7 +504,7 @@ Each additional epoch costs approximately **$1** on 2× A10G.
 
 ### 9.2 Larger Model (d26, ~1.6B Params, ~$48)
 
-The d6 model (28M params) is fundamentally limited in its instruction-following capability. The **d26** model (26 layers, ~1.6B params) is what nanochat is designed for — roughly GPT-2 scale. Training on 8× H100 would take ~2 hours at ~$24/hr, totaling ~$48. This would dramatically improve SFT quality.
+The d6 model (73.5M params) is fundamentally limited in its instruction-following capability. The **d26** model (26 layers, ~1.6B params) is what nanochat is designed for — roughly GPT-2 scale. Training on 8× H100 would take ~2 hours at ~$24/hr, totaling ~$48. This would dramatically improve SFT quality.
 
 ### 9.3 Run ChatCORE Evaluation
 
@@ -517,7 +517,7 @@ modal run nanochat_sft.py::run_eval
 
 This evaluates on ARC-Easy, ARC-Challenge, MMLU, GSM8K, HumanEval, and SpellingBee. Expected ranges for d6:
 
-| Benchmark | Expected (d6, 28M) | Reference (GPT-2, 1.6B) |
+| Benchmark | Expected (d6, 73.5M) | Reference (GPT-2, 1.6B) |
 |-----------|--------------------|------------------------|
 | MMLU | 28–35% (random = 25%) | ~32% |
 | ARC-Easy | 45–55% | ~60% |
