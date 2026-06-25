@@ -3,6 +3,11 @@
 Trains the d6 (6-layer, 384-dim, ~28M param) model on SmolTalk + MMLU + GSM8K
 for 1500 steps. Uses 2x A10G GPUs for best cost/performance.
 
+Optionally uses knowledge distillation (sorted-distribution KD) from a teacher
+model (default: LFM2.5-350M) to improve the student's output distributions.
+The teacher runs a frozen forward pass per batch; its logits are sorted and
+compared with the student's at proportionally-aligned positions.
+
 The pretrain checkpoint is cloned from GitHub in-container (fast), no local upload needed.
 
 Prerequisites:
@@ -11,10 +16,13 @@ Prerequisites:
     modal volume create nanochat-vol
 
 Usage:
-    # Full pipeline (checkpoint → tokenizer → SFT):
+    # Full pipeline with teacher KD (checkpoint → tokenizer → teacher → SFT):
     modal run --detach nanochat_sft.py
 
-    # Just SFT (assumes checkpoint + tokenizer already on volume):
+    # Full pipeline without KD (cheaper, ~$1):
+    modal run --detach nanochat_sft.py --use-teacher=False
+
+    # Just SFT (assumes checkpoint + tokenizer + teacher already on volume):
     modal run --detach nanochat_sft.py::run_sft
 
     # Download the SFT checkpoint:
@@ -36,15 +44,24 @@ TOKENIZER_DIR = VOLUME_DIR / "tokenizer"
 DATA_DIR = VOLUME_DIR / "base_data"
 SFT_CHECKPOINT_DIR = VOLUME_DIR / "chatsft_checkpoints" / "d6"
 IDENTITY_CONVOS = VOLUME_DIR / "identity_conversations.jsonl"
+TEACHER_MODEL_DIR = VOLUME_DIR / "teacher_models" / "lfm25_350m"
+TEACHER_HF_ID = "LiquidAI/LFM2.5-350M"  # safetensors, 354M params, Lfm2ForCausalLM arch
 
 # ── Hyperparameters ────────────────────────────────────────────────────────
 
 MAX_SEQ_LEN = 2048
-DEVICE_BATCH_SIZE = 4
+DEVICE_BATCH_SIZE = 2  # reduced from 4 for KD (student + teacher need more memory)
 TOTAL_BATCH_SIZE = 524288
 NUM_ITERATIONS = 1500
 EVAL_EVERY = 200
 EVAL_TOKENS = 131072
+
+# ── Knowledge Distillation (optional) ──────────────────────────────────────
+# Set USE_TEACHER=False to skip teacher download and run plain SFT.
+USE_TEACHER = True
+KD_ALPHA = 0.9  # CE loss weight (0.9 = 90% CE, 10% KD)
+KD_TEMPERATURE = 2.0  # softmax temperature for KD
+KD_TOP_K = 512  # top-k logits to compare
 
 # ── Modal App & Volumes ────────────────────────────────────────────────────
 
@@ -62,14 +79,25 @@ image = (
         "torchaudio==2.3.0",
         "rustbpe",
         "tiktoken",
+        "huggingface_hub",
+        "accelerate",  # for device_map in teacher model loading
         "datasets",
-        "transformers",
+        "transformers>=4.48.0,<5.0.0",
+        "tokenizers",
         "httpx",
         "pyarrow",
         "sentencepiece",
         "wandb",
         "psutil",
         extra_index_url="https://download.pytorch.org/whl/cu121",
+    )
+    .add_local_file(
+        "/mnt/p/temp-file-share/nanochat_modal/nanochat/nanochat/gpt.py",
+        "/patched/nanochat/gpt.py",
+    )
+    .add_local_file(
+        "/mnt/p/temp-file-share/nanochat_modal/nanochat/scripts/chat_sft.py",
+        "/patched/scripts/chat_sft.py",
     )
 )
 
@@ -80,6 +108,7 @@ image = (
 def setup_nanochat():
     """Clone nanochat if needed and apply patches."""
     import os
+    import shutil
     import subprocess
 
     repo_path = "/nanochat"
@@ -170,6 +199,16 @@ def setup_nanochat():
     else:
         print("⚠ flash_attention.py already patched or pattern changed")
 
+    # Copy patched files from image (return_logits flag, KD support, data mixture fix)
+    patched_gpt = "/patched/nanochat/gpt.py"
+    patched_sft = "/patched/scripts/chat_sft.py"
+    if os.path.exists(patched_gpt):
+        shutil.copy(patched_gpt, os.path.join(repo_path, "nanochat", "gpt.py"))
+        print("✓ Deployed patched gpt.py (return_logits flag)")
+    if os.path.exists(patched_sft):
+        shutil.copy(patched_sft, os.path.join(repo_path, "scripts", "chat_sft.py"))
+        print("✓ Deployed patched chat_sft.py (KD, data mixture, teacher loading)")
+
     print("nanochat setup complete")
 
 
@@ -183,10 +222,21 @@ def setup_nanochat():
     memory=32768,
     timeout=14400,
 )
-def run_sft():
+def run_sft(
+    use_teacher: bool = USE_TEACHER,
+    kd_alpha: float = KD_ALPHA,
+    kd_temperature: float = KD_TEMPERATURE,
+    kd_top_k: int = KD_TOP_K,
+):
     """Run SFT for 1500 steps on 2x A10G.
 
-    Self-contained: downloads checkpoint + trains tokenizer if needed.
+    Self-contained: downloads checkpoint + trains tokenizer + optionally teacher model.
+
+    Args:
+        use_teacher: If True, downloads teacher model and enables KD during SFT.
+        kd_alpha: Weight for CE loss (0.9 = 90%% CE, 10%% KD).
+        kd_temperature: Softmax temperature for sorted KD loss.
+        kd_top_k: Number of top logits to compare in sorted KD loss.
     """
     import os
     import shutil
@@ -283,7 +333,24 @@ def run_sft():
         )
         volume.commit()
 
-    # ── Step 3: Run SFT ──
+    # ── Step 3: Download teacher model (optional, for KD) ──
+    teacher_path_str = ""
+    if use_teacher:
+        if not (TEACHER_MODEL_DIR / "config.json").exists():
+            print(f"\n=== Step 3: Downloading teacher model {TEACHER_HF_ID} ===")
+            from huggingface_hub import snapshot_download
+
+            TEACHER_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+            snapshot_download(
+                TEACHER_HF_ID,
+                local_dir=str(TEACHER_MODEL_DIR),
+                ignore_patterns=["*.h5", "*.ot", "*.msgpack"],
+            )
+            volume.commit()
+            print("\u2713 Teacher model downloaded to volume")
+        teacher_path_str = str(TEACHER_MODEL_DIR)
+
+    # ── Step 4: Run SFT ──
     print("\n" + "=" * 60)
     print("Starting SFT on 2× A10G")
     print(f"  Steps: {NUM_ITERATIONS}")
@@ -292,9 +359,14 @@ def run_sft():
     )
     print(f"  Grad accum: {TOTAL_BATCH_SIZE // (DEVICE_BATCH_SIZE * MAX_SEQ_LEN * 2)}")
     print(f"  Total tokens/step: {TOTAL_BATCH_SIZE:,}")
+    if teacher_path_str:
+        print(
+            f"  Teacher: {TEACHER_HF_ID} (KD enabled, alpha={KD_ALPHA}, T={KD_TEMPERATURE})"
+        )
     print(f"  load_optimizer=0 | eval_every={EVAL_EVERY}")
     print("=" * 60)
 
+    _grad_accum = TOTAL_BATCH_SIZE // (DEVICE_BATCH_SIZE * MAX_SEQ_LEN * 2)
     cmd = [
         "torchrun",
         "--nproc_per_node=2",
@@ -308,7 +380,7 @@ def run_sft():
         "--total-batch-size",
         str(TOTAL_BATCH_SIZE),
         "--num-iterations",
-        str(NUM_ITERATIONS * 32),  # 1500 steps × 32 grad_accum = 48000 micro-batches
+        str(NUM_ITERATIONS * _grad_accum),
         "--eval-every",
         str(EVAL_EVERY),
         "--eval-tokens",
@@ -328,28 +400,32 @@ def run_sft():
         "--run",
         "dummy",
     ]
+    if teacher_path_str:
+        cmd.extend(["--teacher-model-path", teacher_path_str])
+        cmd.extend(["--kd-alpha", str(kd_alpha)])
+        cmd.extend(["--kd-temperature", str(kd_temperature)])
+        cmd.extend(["--kd-top-k", str(kd_top_k)])
 
     print(f"Running: {' '.join(cmd)}")
     sys.stdout.flush()
 
-    # Run with stderr captured so we can see errors even if torchrun swallows them
+    # Run with streaming so Modal logs show live progress
     import subprocess as _sp
 
-    _result = _sp.run(cmd, cwd="/nanochat", capture_output=True, text=True)
-
-    # Print combined output
-    if _result.stdout:
-        print(_result.stdout[-5000:] if len(_result.stdout) > 5000 else _result.stdout)
-    if _result.stderr:
-        print("\n==== STDERR ====")
-        print(_result.stderr[-5000:] if len(_result.stderr) > 5000 else _result.stderr)
-        print("==== END STDERR ====\n")
+    _process = _sp.Popen(
+        cmd, cwd="/nanochat", stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, bufsize=1
+    )
+    # Stream every line in real-time so Modal logs show live progress
+    for line in _process.stdout:
+        print(line, end="", flush=True)
+    _process.wait()
+    _result_returncode = _process.returncode
 
     volume.commit()
-    print(f"\nSFT exited with code {_result.returncode}")
+    print(f"\nSFT exited with code {_result_returncode}")
 
-    if _result.returncode != 0:
-        raise RuntimeError(f"SFT failed with code {_result.returncode}")
+    if _result_returncode != 0:
+        raise RuntimeError(f"SFT failed with code {_result_returncode}")
 
     # Show output checkpoints
     print("\n✓ SFT checkpoints:")
@@ -509,13 +585,27 @@ def run_eval():
 @app.local_entrypoint()
 def main(
     inference_prompt: str = "",
+    use_teacher: bool = USE_TEACHER,
+    kd_alpha: float = KD_ALPHA,
+    kd_temperature: float = KD_TEMPERATURE,
 ):
     """Run the full SFT pipeline on nanochat d6.
 
     Spawns both tokenizer training and SFT as a single detached job.
+    Optionally enables knowledge distillation from a larger teacher model.
+
+    Args:
+        inference_prompt: Prompt for test inference (optional).
+        use_teacher: If True, download LFM2.5-350M and enable KD.
+        kd_alpha: Weight for CE loss (0.9 = 90%% CE, 10%% KD).
+        kd_temperature: Softmax temperature for sorted KD loss.
     """
     print("Spawning SFT on 2× A10G (detached, self-contained)...")
-    run_sft.spawn()
+    if use_teacher:
+        print(f"  Teacher: {TEACHER_HF_ID} | alpha={kd_alpha}, T={kd_temperature}")
+    run_sft.spawn(
+        use_teacher=use_teacher, kd_alpha=kd_alpha, kd_temperature=kd_temperature
+    )
     print()
     print("=" * 60)
     print("  SFT SPAWNED — running in the cloud.")
@@ -523,5 +613,6 @@ def main(
     print("  Download:   modal run nanochat_sft.py::download_sft")
     print("  Inference:  modal run nanochat_sft.py::test_inference --prompt 'Hi!'")
     print("  Eval:       modal run nanochat_sft.py::run_eval")
-    print("  Estimated:  ~60-90 min, ~$1-2 total")
+    cost_est = "~$3-5 total" if use_teacher else "~$1-2 total"
+    print(f"  Estimated:  ~60-90 min, {cost_est}")
     print("=" * 60)
