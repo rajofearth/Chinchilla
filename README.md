@@ -2,7 +2,7 @@
 
 Supervised Fine-Tuning (SFT) of [karpathy/nanochat](https://github.com/karpathy/nanochat) language models — trained on [Modal](https://modal.com) cloud GPUs with ResFormer-style value embeddings, sliding window attention, and knowledge distillation.
 
-**d6 model:** 6-layer, 384-dim, ~73.5M parameters. Quick to train (~$1.20 on 2× A10G), runs on CPU.
+**d6 model:** 6-layer, 384-dim, ~ 73.5M parameters. Quick to train (~$1.20 on 2× A10G), runs on CPU.
 
 ## Quick Links
 
@@ -28,7 +28,3 @@ Supervised Fine-Tuning (SFT) of [karpathy/nanochat](https://github.com/karpathy/
 ├── README.md                # This file
 └── LICENSE                  # MIT
 ```
-
-## License
-
-MIT — same as [nanochat](https://github.com/karpathy/nanochat).
