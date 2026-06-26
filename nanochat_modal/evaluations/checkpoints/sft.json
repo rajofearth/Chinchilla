@@ -1,0 +1,16 @@
+{
+  "name": "sft",
+  "path": "/mnt/p/temp-file-share/nanochat_modal/checkpoints/sft",
+  "step": 1500,
+  "val_bpb": 0.47630114075293484,
+  "model_config": {
+    "sequence_len": 2048,
+    "vocab_size": 32768,
+    "n_layer": 6,
+    "n_head": 6,
+    "n_kv_head": 6,
+    "n_embd": 384,
+    "window_pattern": "L"
+  },
+  "files": ["meta_001500.json", "model_001500.pt", "optim_001500_rank0.pt", "optim_001500_rank1.pt"]
+}

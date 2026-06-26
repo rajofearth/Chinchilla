@@ -1,0 +1,20 @@
+{
+  "run_id": "2026-06-26_sft-vs-d6",
+  "date": "2026-06-26",
+  "checkpoint1": {
+    "name": "sft",
+    "step": 1500,
+    "val_bpb": 0.476
+  },
+  "checkpoint2": {
+    "name": "d6",
+    "step": 971,
+    "val_bpb": 0.489
+  },
+  "num_questions": 12,
+  "temperature": 0.7,
+  "top_k": 50,
+  "max_tokens": 256,
+  "device": "cpu",
+  "duration_seconds": 0
+}

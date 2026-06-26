@@ -1,0 +1,16 @@
+{
+  "name": "d6",
+  "path": "/mnt/p/temp-file-share/nanochat_modal/checkpoints/sft-d6",
+  "step": 971,
+  "val_bpb": 0.48913308218773954,
+  "model_config": {
+    "sequence_len": 2048,
+    "vocab_size": 32768,
+    "n_layer": 6,
+    "n_head": 6,
+    "n_kv_head": 6,
+    "n_embd": 384,
+    "window_pattern": "L"
+  },
+  "files": ["meta_000971.json", "model_000971.pt"]
+}

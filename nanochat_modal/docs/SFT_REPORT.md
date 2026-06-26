@@ -532,7 +532,41 @@ The current mixture heavily emphasizes spelling tasks (280K of ~1.07M rows, ~26%
 - **Adding** code data (HumanEval is eval-only, no training split)
 - **Increasing** SmolTalk epochs (460K rows × 2–3 epochs would better teach conversation format)
 
-### 9.5 Enable ChatCORE During Training
+A revised mixture that avoids data exhaustion at step 971 while keeping total rows similar:
+
+| Component | Current | Proposed | Change |
+|-----------|---------|----------|--------|
+| SimpleSpelling | 200K × 1 epoch | 80K × 1 epoch | −60% |
+| SpellingBee | 80K × 1 epoch | 40K × 1 epoch | −50% |
+| SmolTalk | 460K × 1 epoch | 460K × 3 epochs | +3× |
+| GSM8K | ~7.5K × 4 epochs | ~7.5K × 8 epochs | +2× |
+| **Total** | ~1.07M | ~1.05M | ≈ same |
+
+### 9.5 Knowledge Distillation Approaches (Research Findings)
+
+Attempting online logit-level KD with LFM2.5-350M revealed a **vocabulary mismatch**: nanochat's rustbpe tokenizer (32,768 vocab) and LFM2.5-350M's tokenizer are incompatible. Direct logit comparison between different vocabularies is undefined.
+
+Research on cross-tokenizer distillation identified several approaches:
+
+| Method | Description | Reference |
+|--------|-------------|-----------|
+| **ULD Loss** | Wasserstein distance instead of KL divergence, works across different vocabularies | Boizard et al., 2024 |
+| **ALM** | Approximate Likelihood Matching via byte-level chunk alignment and binarized f-divergence | Minixhofer et al., 2025 (arXiv 2503.20083) |
+| **Offline hard-label distillation** | Teacher generates completions → student trains on them (most practical) | Standard approach |
+
+#### Capacity Gap
+
+Distillation Scaling Laws (Busbridge et al., 2025) show an optimal teacher-student ratio follows a linear relationship. For the 73.5M d6 model:
+
+| Teacher | Ratio | Verdict |
+|---------|-------|---------|
+| LFM2.5-350M (350M) | ~4.8× | ✅ Near-optimal |
+| Qwen3.5-0.8B (800M) | ~10.9× | ⚠️ Borderline |
+| d26 (~1.6B) | ~22× | ❌ Needs TAID or TA chain |
+
+Ratios > 10× cause mode averaging (TAID, arXiv 2604.00626). The offline hard-label distillation approach avoids both the vocabulary mismatch and capacity gap issues.
+
+### 9.6 Enable ChatCORE During Training
 
 The `--chatcore-every 0` flag disables ChatCORE evaluation during training because it's slow. Set `--chatcore-every=500` to get per-task benchmark scores throughout training, which helps identify when the model starts overfitting.
 

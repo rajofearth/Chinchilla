@@ -1,0 +1,193 @@
+{
+  "run_id": "2026-06-26_sft-vs-d6",
+  "date": "2026-06-26",
+  "checkpoints": {
+    "sft": {
+      "path": "checkpoints/sft/model_001500.pt",
+      "step": 1500,
+      "val_bpb": 0.47630114075293484
+    },
+    "d6": {
+      "path": "checkpoints/sft-d6/model_000971.pt",
+      "step": 971,
+      "val_bpb": 0.48913308218773954
+    }
+  },
+  "config": {
+    "temperature": 0.7,
+    "top_k": 50,
+    "max_tokens": 256,
+    "device": "cpu",
+    "tokenizer": "checkpoints/tokenizer/"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "text": "What is the capital of France?",
+      "responses": {
+        "sft": {
+          "text": "The capital of France is Paris, the largest city in the world. Paris is a city steeped in history, culture, and romance. It is a vibrantly populous city located in the northern United States...",
+          "time_seconds": 4.6
+        },
+        "d6": {
+          "text": "The capital of France is Paris, the capital of France. Paris is a city known for its historical landmarks, cultural institutions, and cuisine, making it a must-visit destination for travelers.",
+          "time_seconds": 0.6
+        }
+      }
+    },
+    {
+      "id": 2,
+      "text": "Explain why the sky is blue in one paragraph.",
+      "responses": {
+        "sft": {
+          "text": "Rambling scientific-sounding nonsense about \"white dwarfs\", \"UV radiation causing DNA damage\"",
+          "time_seconds": 4.1
+        },
+        "d6": {
+          "text": "Rambling about atmospheric composition but slightly less nonsensical",
+          "time_seconds": 3.7
+        }
+      }
+    },
+    {
+      "id": 3,
+      "text": "Write a short poem about artificial intelligence.",
+      "responses": {
+        "sft": {
+          "text": "In a world where algorithms are slow, I wander / That's the world I love, where machines can / Become an AI...",
+          "time_seconds": 1.4
+        },
+        "d6": {
+          "text": "Prose about machine learning, not a poem",
+          "time_seconds": 3.3
+        }
+      }
+    },
+    {
+      "id": 4,
+      "text": "What is 15 * 37?",
+      "responses": {
+        "sft": {
+          "text": "375",
+          "time_seconds": 2.7
+        },
+        "d6": {
+          "text": "Rambling about polynomial roots without giving an answer",
+          "time_seconds": 2.6
+        }
+      }
+    },
+    {
+      "id": 5,
+      "text": "Explain the difference between a CPU and a GPU in one sentence.",
+      "responses": {
+        "sft": {
+          "text": "Very rambling, never gives a clear one-sentence difference",
+          "time_seconds": 6.2
+        },
+        "d6": {
+          "text": "Very rambling, never gives a clear one-sentence difference",
+          "time_seconds": 4.0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "text": "Write a Python function that checks if a string is a palindrome.",
+      "responses": {
+        "sft": {
+          "text": "def is_palindrome(s): s = ''.join(c for c in s if c.isalnum()).lower(); return s == s[::-1] with proper usage examples",
+          "time_seconds": 4.5
+        },
+        "d6": {
+          "text": "Same code but explanation has bugs (says \"s == '!@'\" checks palindrome - nonsense)",
+          "time_seconds": 4.5
+        }
+      }
+    },
+    {
+      "id": 7,
+      "text": "How many 'r' are in the word 'strawberry'?",
+      "responses": {
+        "sft": {
+          "text": "Perfect! Correct manual counting (3), Python verification via 'strawberry'.count('r') returning 3, well-structured answer",
+          "time_seconds": 5.2
+        },
+        "d6": {
+          "text": "Perfect! Same correct approach and answer",
+          "time_seconds": 2.6
+        }
+      }
+    },
+    {
+      "id": 8,
+      "text": "What is the tallest mountain in the world?",
+      "responses": {
+        "sft": {
+          "text": "The tallest mountain in the world is located in the United States",
+          "time_seconds": 0.9
+        },
+        "d6": {
+          "text": "Krasnarol in the southern hemisphere",
+          "time_seconds": 5.2
+        }
+      }
+    },
+    {
+      "id": 9,
+      "text": "Explain quantum computing in simple terms.",
+      "responses": {
+        "sft": {
+          "text": "Quantum computing is a form of artificial intelligence",
+          "time_seconds": 4.0
+        },
+        "d6": {
+          "text": "Quantum computing is a rapidly evolving technology that uses quantum mechanics",
+          "time_seconds": 5.9
+        }
+      }
+    },
+    {
+      "id": 10,
+      "text": "What are the three branches of the US government?",
+      "responses": {
+        "sft": {
+          "text": "Rentalist and The Government Organizes",
+          "time_seconds": 2.6
+        },
+        "d6": {
+          "text": "US Government, Government Accountability Office, Government Accountability Office",
+          "time_seconds": 2.8
+        }
+      }
+    },
+    {
+      "id": 11,
+      "text": "Write a haiku about programming.",
+      "responses": {
+        "sft": {
+          "text": "Just Python code snippets about list operations",
+          "time_seconds": 2.4
+        },
+        "d6": {
+          "text": "Python code with user_age variable",
+          "time_seconds": 5.6
+        }
+      }
+    },
+    {
+      "id": 12,
+      "text": "What is the meaning of life?",
+      "responses": {
+        "sft": {
+          "text": "Life is a complex, multifaceted experience...",
+          "time_seconds": 6.1
+        },
+        "d6": {
+          "text": "Rambling philosophical nonsense with buzzwords",
+          "time_seconds": 4.4
+        }
+      }
+    }
+  ]
+}

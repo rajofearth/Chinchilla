@@ -15,10 +15,6 @@ env/
 .env/
 virtualenv/
 
-# Modal / cloud training checkpoints (large, regenerated)
-chatsft_checkpoints/
-tokenizer/
-
 # OS
 .DS_Store
 Thumbs.db

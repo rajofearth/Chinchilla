@@ -1,6 +1,6 @@
 """Supervised Fine-Tuning of nanochat d6 on Modal.
 
-Trains the d6 (6-layer, 384-dim, ~28M param) model on SmolTalk + MMLU + GSM8K
+Trains the d6 (6-layer, 384-dim, ~73.5M param) model on SmolTalk + MMLU + GSM8K
 for 1500 steps. Uses 2x A10G GPUs for best cost/performance.
 
 Optionally uses knowledge distillation (sorted-distribution KD) from a teacher
