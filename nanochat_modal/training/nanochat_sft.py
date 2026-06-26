@@ -78,9 +78,9 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("git", "git-lfs", "curl")
     .pip_install(
-        "torch==2.5.1",
-        "torchvision==0.20.1",
-        "torchaudio==2.5.1",
+        "torch==2.3.0",
+        "torchvision==0.18.0",
+        "torchaudio==2.3.0",
         "rustbpe",
         "tiktoken",
         "huggingface_hub",
@@ -232,7 +232,7 @@ def run_sft(
     kd_temperature: float = KD_TEMPERATURE,
     kd_top_k: int = KD_TOP_K,
     save_every: int = SAVE_EVERY,
-    resume_step: int = 0,
+    resume_step: int = -1,
 ):
     """Run SFT for 1500 steps on 2x A10G.
 
@@ -351,8 +351,14 @@ def run_sft(
     print(f"  Total tokens/step: {TOTAL_BATCH_SIZE:,}")
     if teacher_path_str:
         print(
-            f"  Teacher: {TEACHER_HF_ID} (KD enabled, alpha={KD_ALPHA}, T={KD_TEMPERATURE})"
+            f"  Teacher: {TEACHER_HF_ID} (KD enabled, alpha={KD_ALPHA}, T={KD_TEMPERATURE}")
         )
+    if resume_step > 0:
+        print(f"  Resume from step {resume_step} (auto-detect)")
+    elif resume_step == -1:
+        print(f"  Auto-resume: yes (will detect latest checkpoint)")
+    if not teacher_path_str:
+        print(f"  No teacher (plain SFT)")
     print(f"  load_optimizer=0 | eval_every={EVAL_EVERY} | save_every={save_every}")
     print("=" * 60)
 
@@ -405,14 +411,42 @@ def run_sft(
 
     # Run with streaming so Modal logs show live progress
     import subprocess as _sp
+    import threading as _threading
+    import time as _time
 
     _process = _sp.Popen(
         cmd, cwd="/nanochat", stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, bufsize=1
     )
+
+    # Background thread: periodically commit the volume so checkpoints survive
+    # container kills. Check for new .pt files and commit when found.
+    _last_ckpt_count = len(list(SFT_CHECKPOINT_DIR.glob("model_*.pt")))
+    _commit_active = True
+
+    def _volume_committer():
+        nonlocal _last_ckpt_count
+        while _commit_active:
+            _time.sleep(30)  # check every 30s
+            if not _commit_active:
+                break
+            try:
+                cur = len(list(SFT_CHECKPOINT_DIR.glob("model_*.pt")))
+                if cur > _last_ckpt_count:
+                    volume.commit()
+                    print(f"[volume] Committed {cur - _last_ckpt_count} new checkpoint(s)")
+                    _last_ckpt_count = cur
+            except Exception:
+                pass  # best-effort
+
+    _committer = _threading.Thread(target=_volume_committer, daemon=True)
+    _committer.start()
+
     # Stream every line in real-time so Modal logs show live progress
     for line in _process.stdout:
         print(line, end="", flush=True)
     _process.wait()
+    _commit_active = False
+    _committer.join(timeout=10)
     _result_returncode = _process.returncode
 
     volume.commit()
@@ -664,7 +698,7 @@ def main(
     use_teacher: bool = USE_TEACHER,
     kd_alpha: float = KD_ALPHA,
     kd_temperature: float = KD_TEMPERATURE,
-    resume_step: int = 0,
+    resume_step: int = -1,
 ):
     """Run the full SFT pipeline on nanochat d6.
 
