@@ -25,6 +25,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Agent skill files (not project code)
+.agents/
+
 # Environment files
 .env
 .env.local
