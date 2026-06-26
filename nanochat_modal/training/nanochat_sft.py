@@ -36,6 +36,9 @@ from pathlib import Path
 
 import modal
 
+# ── Script-relative paths for local file mounting ──────────────────────────
+_SCRIPT_DIR = Path(__file__).parent.parent  # nanochat_modal/
+
 # ── Paths ──────────────────────────────────────────────────────────────────
 
 VOLUME_DIR = Path("/vol")
@@ -54,6 +57,7 @@ DEVICE_BATCH_SIZE = 2  # reduced from 4 for KD (student + teacher need more memo
 TOTAL_BATCH_SIZE = 524288
 NUM_ITERATIONS = 1500
 EVAL_EVERY = 200
+SAVE_EVERY = 200  # save checkpoint every N optimizer steps (0 = only at end)
 EVAL_TOKENS = 131072
 
 # ── Knowledge Distillation (optional) ──────────────────────────────────────
@@ -74,9 +78,9 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("git", "git-lfs", "curl")
     .pip_install(
-        "torch==2.3.0",
-        "torchvision==0.18.0",
-        "torchaudio==2.3.0",
+        "torch==2.5.1",
+        "torchvision==0.20.1",
+        "torchaudio==2.5.1",
         "rustbpe",
         "tiktoken",
         "huggingface_hub",
@@ -92,11 +96,11 @@ image = (
         extra_index_url="https://download.pytorch.org/whl/cu121",
     )
     .add_local_file(
-        "/mnt/p/temp-file-share/nanochat_modal/nanochat/nanochat/gpt.py",
+        str(_SCRIPT_DIR / "nanochat" / "nanochat" / "gpt.py"),
         "/patched/nanochat/gpt.py",
     )
     .add_local_file(
-        "/mnt/p/temp-file-share/nanochat_modal/nanochat/scripts/chat_sft.py",
+        str(_SCRIPT_DIR / "nanochat" / "scripts" / "chat_sft.py"),
         "/patched/scripts/chat_sft.py",
     )
 )
@@ -220,13 +224,15 @@ def setup_nanochat():
     volumes={str(VOLUME_DIR): volume},
     gpu="A10G:2",
     memory=32768,
-    timeout=14400,
+    timeout=86400,
 )
 def run_sft(
     use_teacher: bool = USE_TEACHER,
     kd_alpha: float = KD_ALPHA,
     kd_temperature: float = KD_TEMPERATURE,
     kd_top_k: int = KD_TOP_K,
+    save_every: int = SAVE_EVERY,
+    resume_step: int = 0,
 ):
     """Run SFT for 1500 steps on 2x A10G.
 
@@ -253,39 +259,23 @@ def run_sft(
     os.environ["PYTHONUNBUFFERED"] = "1"
     os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
-    # ── Step 0: Download checkpoint ──
+    # ── Step 0: Checkpoint ──
     if not (VOLUME_CHECKPOINT_DIR / "model_008600.pt").exists():
-        print("\n=== Step 0: Downloading checkpoint ===")
-        tmp = Path(tempfile.mkdtemp())
-        clone_dir = tmp / "checkpoint_repo"
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "https://github.com/rajofearth/temp-file-share.git",
-                str(clone_dir),
-            ],
-            check=True,
-            capture_output=True,
+        print("\n=== Step 0: Checkpoint not found on volume ===")
+        print("The pretrain checkpoint was not uploaded to the volume.")
+        print("Run through the main entrypoint to auto-upload:")
+        print("  modal run --detach nanochat_sft.py")
+        print("")
+        print("Or upload manually:")
+        print(
+            "  modal volume put nanochat-vol <path-to-model_008600.pt> /base_checkpoints/d6/model_008600.pt"
         )
-        print("Pulling LFS objects...")
-        subprocess.run(
-            ["git", "-C", str(clone_dir), "lfs", "pull"],
-            check=True,
-            capture_output=True,
+        print(
+            "  modal volume put nanochat-vol <path-to-meta_008600.json> /base_checkpoints/d6/meta_008600.json"
         )
-        VOLUME_CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(
-            str(clone_dir / "model_008600.pt"),
-            str(VOLUME_CHECKPOINT_DIR / "model_008600.pt"),
+        raise FileNotFoundError(
+            "Pretrain checkpoint not found on volume. See instructions above."
         )
-        shutil.copy2(
-            str(clone_dir / "meta_008600.json"),
-            str(VOLUME_CHECKPOINT_DIR / "meta_008600.json"),
-        )
-        shutil.rmtree(tmp, ignore_errors=True)
-        volume.commit()
-        print("✓ Checkpoint ready")
 
     # ── Step 1: Train tokenizer ──
     if not (TOKENIZER_DIR / "tokenizer.pkl").exists():
@@ -363,7 +353,7 @@ def run_sft(
         print(
             f"  Teacher: {TEACHER_HF_ID} (KD enabled, alpha={KD_ALPHA}, T={KD_TEMPERATURE})"
         )
-    print(f"  load_optimizer=0 | eval_every={EVAL_EVERY}")
+    print(f"  load_optimizer=0 | eval_every={EVAL_EVERY} | save_every={save_every}")
     print("=" * 60)
 
     _grad_accum = TOTAL_BATCH_SIZE // (DEVICE_BATCH_SIZE * MAX_SEQ_LEN * 2)
@@ -383,6 +373,10 @@ def run_sft(
         str(NUM_ITERATIONS * _grad_accum),
         "--eval-every",
         str(EVAL_EVERY),
+        "--save-every",
+        str(save_every),
+        "--resume-step",
+        str(resume_step),
         "--eval-tokens",
         str(EVAL_TOKENS),
         "--init-lr-frac",
@@ -579,6 +573,88 @@ def run_eval():
     return result.returncode
 
 
+# ── Local helpers for checkpoint upload ─────────────────────────────────
+
+
+def _checkpoint_local_paths():
+    """Return (pt_path, json_path) for the pretrain checkpoint on the local machine."""
+    ckpt_dir = _SCRIPT_DIR / "checkpoints" / "pretrain"
+    return ckpt_dir / "model_008600.pt", ckpt_dir / "meta_008600.json"
+
+
+def _ensure_checkpoint_on_volume():
+    """Upload the pretrain checkpoint to the Modal volume if it's not already there.
+
+    Runs locally (inside @app.local_entrypoint), so it can access the local filesystem.
+    """
+    import subprocess
+    import sys
+
+    vol_path_pt = "/base_checkpoints/d6/model_008600.pt"
+    vol_path_json = "/base_checkpoints/d6/meta_008600.json"
+
+    # Quick check via modal volume ls (avoids re-uploading every time)
+    result = subprocess.run(
+        [sys.executable, "-m", "modal", "volume", "ls", "nanochat-vol", vol_path_pt],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode == 0 and "model_008600.pt" in result.stdout:
+        print("✓ Pretrain checkpoint already on volume, skipping upload.")
+        return
+
+    local_pt, local_json = _checkpoint_local_paths()
+    if not local_pt.exists():
+        print(f"✗ Local checkpoint not found at: {local_pt}")
+        print("  Upload the checkpoint manually with:")
+        print(
+            f"    modal volume put nanochat-vol <path-to-model_008600.pt> {vol_path_pt}"
+        )
+        print(
+            f"    modal volume put nanochat-vol <path-to-meta_008600.json> {vol_path_json}"
+        )
+        sys.exit(1)
+
+    print("Uploading pretrain checkpoint to Modal volume...")
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "modal",
+            "volume",
+            "put",
+            "nanochat-vol",
+            str(local_pt),
+            vol_path_pt,
+        ],
+        check=True,
+        timeout=600,
+    )
+    print("✓ Uploaded model_008600.pt")
+
+    if local_json.exists():
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "modal",
+                "volume",
+                "put",
+                "nanochat-vol",
+                str(local_json),
+                vol_path_json,
+            ],
+            check=True,
+            timeout=30,
+        )
+        print("✓ Uploaded meta_008600.json")
+    else:
+        print("⚠ meta_008600.json not found locally, skipping.")
+
+    print("Pretrain checkpoint ready on volume.")
+
+
 # ── CLI Entrypoint ─────────────────────────────────────────────────────────
 
 
@@ -588,6 +664,7 @@ def main(
     use_teacher: bool = USE_TEACHER,
     kd_alpha: float = KD_ALPHA,
     kd_temperature: float = KD_TEMPERATURE,
+    resume_step: int = 0,
 ):
     """Run the full SFT pipeline on nanochat d6.
 
@@ -600,11 +677,17 @@ def main(
         kd_alpha: Weight for CE loss (0.9 = 90%% CE, 10%% KD).
         kd_temperature: Softmax temperature for sorted KD loss.
     """
+    # Step 0: ensure the pretrain checkpoint is on the volume
+    _ensure_checkpoint_on_volume()
+
     print("Spawning SFT on 2× A10G (detached, self-contained)...")
     if use_teacher:
         print(f"  Teacher: {TEACHER_HF_ID} | alpha={kd_alpha}, T={kd_temperature}")
     run_sft.spawn(
-        use_teacher=use_teacher, kd_alpha=kd_alpha, kd_temperature=kd_temperature
+        use_teacher=use_teacher,
+        kd_alpha=kd_alpha,
+        kd_temperature=kd_temperature,
+        resume_step=resume_step,
     )
     print()
     print("=" * 60)
