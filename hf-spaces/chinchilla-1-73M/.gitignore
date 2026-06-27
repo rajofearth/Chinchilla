@@ -1,0 +1,4 @@
+# Model cache downloaded from HuggingFace Hub
+model_cache/
+__pycache__/
+*.pyc
