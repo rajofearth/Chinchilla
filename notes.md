@@ -210,7 +210,7 @@ Create models/chinchilla-1/README.md as a HuggingFace model card for "Chinchilla
 - Weaknesses: hallucination, math, facts (with eval citations)
 - Include inference.py minimal script loading checkpoints/sft/model_001500.pt + tokenizer
 - Include config.json derived from ARCHITECTURE.md
-- License: MIT (match nanochat)
+- License: (match this project)
 - Base model: nanochat d6 pretrain step 8600 + SFT
 Do NOT oversell capabilities.
 ```
