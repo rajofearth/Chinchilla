@@ -15,6 +15,8 @@ library_name: nanochat
 
 # Chinchilla-1-73M
 
+![Chinchilla-1 Banner](banner.png)
+
 **Chinchilla-1** is a ~73.5M parameter instruction-tuned language model built on the [nanochat](https://github.com/karpathy/nanochat) d6 architecture. The name references [Chinchilla scaling laws](https://arxiv.org/abs/2203.15556) — this is a **research-scale** model, not a production LLM.
 
 This model was created as a learning exercise in SFT infrastructure (Modal, torchrun, MuonAdamW) and to explore nanochat's custom architecture (value embeddings, smear mechanism, backout residuals). It should be treated as a baseline for understanding how small transformers behave after SFT — not as a usable chatbot.
