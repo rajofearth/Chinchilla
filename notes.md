@@ -1,6 +1,6 @@
 # Model Training Pivot — Research Notes
 
-> **Last updated:** 2026-06-26 (rev 2 — finetune-first, Ornith-lite, Chinchilla-1 HF release)
+> **Last updated:** 2026-06-30 (rev 3 — Mars-1.0 SFT Agent on LiquidAI/LFM2.5-8B-A1B)
 
 ---
 
@@ -702,56 +702,61 @@ Month 5–6:    DPO v2 + merge + GGUF export + local app testing      (~$30)
 
 ---
 
-## 9. Modal infrastructure plan
+## 9. Modal infrastructure plan (Mars-1.0 SFT Agent)
 
 ### Volume layout
 
 ```
 /vol/
-├── bases/              # Downloaded HF weights (Qwen3-0.6B-Base, etc.)
+├── bases/                      # Downloaded HF weights (LiquidAI__LFM2.5-8B-A1B)
 ├── checkpoints/
-│   ├── pretrain/       # step_XXXXX/ (model + optim + scheduler + dataloader state)
-│   ├── sft/
-│   ├── dpo/
-│   └── rl/
-├── data/               # Tokenized shards or parquet
-├── tokenized/          # Preprocessed binary chunks
-├── exports/            # GGUF, merged HF repos
-└── evals/              # lm-eval results JSON
+│   ├── sft/mars_sft_agent/     # LoRA checkpoints (adapter, optim, scheduler)
+│   ├── dpo/                    # (future)
+│   └── rl/                     # (future)
+├── data/hf-cache/              # HF cache (TRANSFORMERS_CACHE)
+├── tokenized/                  # Pre-tokenized dataset cache (speeds up resume)
+├── exports/                    # Merged HF repos (future)
+└── evals/                      # lm-eval results (future)
 ```
 
-### Checkpoint resume (critical for multi-month)
+### Checkpoint resume (TRL SFTTrainer)
 
-Every training script must save:
-- `model.safetensors` (or sharded)
-- `optimizer.pt`
-- `scheduler.pt`
-- `rng_state.pt`
-- `dataloader_state.pt` (shard index + offset)
-- `meta.json` (step, loss, config, git hash)
+LoRA checkpoints are saved via TRL's `SFTTrainer` with `resume_from_checkpoint`. Each checkpoint:
+- `adapter_model.safetensors` + `adapter_config.json` (LoRA weights via PEFT)
+- `optimizer.pt`, `scheduler.pt`, `trainer_state.json`, `rng_state.pkl`
+- Tokenizer files
+
+Volume is committed after each save via a custom `VolumeCommitCallback`.
 
 Modal pattern:
 ```python
-@app.function(gpu="A10G", volumes={"/vol": vol}, timeout=86400)
-def train_step(resume_from: str | None = None):
-    if resume_from:
-        load_checkpoint(resume_from)
-    # train until budget exhausted or step limit
-    save_checkpoint("/vol/checkpoints/...")
+@app.function(gpu="A100-80GB", volumes={"/vol": vol}, timeout=72000)
+def train(resume_from: str | None = None):
+    trainer = SFTTrainer(
+        args=TrainingArguments(resume_from_checkpoint=resume_from),
+        ...
+    )
+    trainer.train()
     vol.commit()
 ```
 
-Use `modal run --detach` so runs survive terminal close. Poll with `modal app logs`.
+Use `modal run --detach` so runs survive terminal close. Monitor with `modal app logs <app-id> --tail 20 --timestamps`.
 
 ### GPU selection by stage
 
 | Stage | GPU | Why |
 |-------|-----|-----|
-| Pretrain 1B | A100 80GB or 2× A10G | Memory for 1B + batch |
-| SFT/DPO LoRA | A10G | 1B LoRA fits easily |
-| SFT full | A10G | ~4 GB model + activations |
-| GRPO | A10G | Multiple rollouts; may need A100 if long context |
-| GGUF convert | CPU | No GPU needed |
+| SFT LoRA | A100-80GB | 8B MoE LoRA needs 80GB for batch 8 |
+| SFT full | A100-80GB | Full FT on 8B MoE needs 80GB |
+| DPO LoRA | A10G | 8B MoE LoRA fits on A10G |
+| GRPO | A100-80GB | Multiple rollouts on 8B MoE need 80GB |
+
+### PEFT monkey-patch (PEFT 0.19.1)
+
+`common.py` contains a generic monkey-patch that filters unexpected kwargs from
+`WeightConverter.__init__`. This works around a PEFT 0.19.1 bug where new common
+kwargs are passed to converters that don't expect them. If PEFT is upgraded, verify
+whether this patch can be removed.
 
 ---
 

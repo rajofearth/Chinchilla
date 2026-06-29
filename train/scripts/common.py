@@ -2,19 +2,39 @@
 
 from __future__ import annotations
 
+import hashlib
+
+# Monkey-patch: PEFT 0.19.1's build_peft_weight_mapping passes unexpected kwargs
+# (distributed_operation, quantization_operation, etc.) to WeightConverter.__init__
+# which doesn't accept them. This is a PEFT bug; we strip unrecognized kwargs.
+import inspect
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import peft.utils.transformers_weight_conversion as _peft_twc
+
+_orig_wc_init = _peft_twc.WeightConverter.__init__
+_wc_params = set(inspect.signature(_orig_wc_init).parameters.keys())
+
+
+def _patched_wc_init(self, *args, **kwargs):
+    filtered = {k: v for k, v in kwargs.items() if k in _wc_params}
+    return _orig_wc_init(self, *args, **filtered)
+
+
+_peft_twc.WeightConverter.__init__ = _patched_wc_init
+
 import torch
 import yaml
+from datasets import Dataset, load_from_disk
 from peft import LoraConfig, PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
-
 from volumes import (
     DEFAULT_MODEL_ID,
+    TOKENIZED_DIR,
     base_model_dir,
     ensure_volume_layout,
     stage_output_dir,
@@ -67,7 +87,9 @@ def find_latest_final_adapter(stage: str, project_name: str) -> Path | None:
     return Path(ckpt) if ckpt else None
 
 
-def resolve_adapter_path(cfg: dict[str, Any], *, default_stage: str | None = None) -> Path | None:
+def resolve_adapter_path(
+    cfg: dict[str, Any], *, default_stage: str | None = None
+) -> Path | None:
     """Resolve LoRA adapter from explicit path, previous stage, or 'latest'."""
     explicit = cfg.get("adapter_path")
     if explicit:
@@ -177,9 +199,13 @@ def write_run_meta(
     (output_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
 
-def prepare_run(cfg: dict[str, Any], stage: str) -> tuple[Path, str | None, Path | None]:
+def prepare_run(
+    cfg: dict[str, Any], stage: str
+) -> tuple[Path, str | None, Path | None]:
     ensure_volume_layout()
-    run_name = cfg.get("run_name") or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    run_name = cfg.get("run_name") or datetime.now(timezone.utc).strftime(
+        "%Y%m%d_%H%M%S"
+    )
     output_dir = stage_output_dir(stage, cfg["project_name"], run_name)
 
     training = cfg.get("training", {})
@@ -205,3 +231,72 @@ def save_final(trainer, output_dir: Path, tokenizer, volume: Any | None = None) 
     if volume is not None:
         volume.commit()
     return final_dir
+
+
+def get_or_cache_sft_dataset(
+    dataset_cfg: dict[str, Any],
+    tokenizer,
+    max_length: int,
+    model_id: str,
+    project_name: str = "mars_sft_agent",
+    force_rebuild: bool = False,
+) -> Dataset:
+    """Build and cache tokenized SFT dataset.
+
+    Cache key = MD5 of (dataset mix config + model_id + max_length).
+    Saves/loads tokenized dataset to/from /vol/tokenized/<project>/<cache_key>/
+    """
+    # Build deterministic cache key
+    cache_input = {
+        "mix": dataset_cfg.get("mix", []),
+        "model_id": model_id,
+        "max_length": max_length,
+    }
+    cache_key = hashlib.md5(
+        json.dumps(cache_input, sort_keys=True, default=str).encode()
+    ).hexdigest()
+
+    cache_dir = TOKENIZED_DIR / project_name / cache_key
+
+    if not force_rebuild and cache_dir.exists() and any(cache_dir.iterdir()):
+        print(f"Loading tokenized dataset from cache: {cache_dir}")
+        return load_from_disk(str(cache_dir))
+
+    # Build raw formatted dataset
+    print("Building formatted dataset...")
+    from dataset_mix import build_mixed_dataset
+
+    raw_dataset = build_mixed_dataset(dataset_cfg)
+    print(f"Formatted dataset: {len(raw_dataset)} samples")
+
+    # Tokenize with apply_chat_template
+    def tokenize_fn(batch):
+        texts = tokenizer.apply_chat_template(
+            batch["messages"],
+            tokenize=False,
+            add_generation_prompt=False,
+        )
+        tokenized = tokenizer(
+            texts,
+            truncation=True,
+            max_length=max_length,
+            padding=False,
+            return_tensors=None,
+        )
+        tokenized["labels"] = tokenized["input_ids"].copy()
+        return tokenized
+
+    print(f"Tokenizing {len(raw_dataset)} samples (max_length={max_length})...")
+    tokenized_dataset = raw_dataset.map(
+        tokenize_fn,
+        batched=True,
+        remove_columns=["messages"],
+        desc="Tokenizing",
+    )
+
+    # Save to cache
+    print(f"Saving tokenized dataset to cache: {cache_dir}")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tokenized_dataset.save_to_disk(str(cache_dir))
+
+    return tokenized_dataset

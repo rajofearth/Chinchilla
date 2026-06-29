@@ -63,14 +63,13 @@ image = (
         "torch>=2.6.0",
         "transformers>=5.2.0",
         "trl>=0.19.0",
-        "peft>=0.14.0",
+        "peft>=0.14.0",  # weight will monkey-patch WeightConverter.__init__ to fix distributed_operation bug
         "datasets>=3.0.0",
         "accelerate>=1.2.0",
         "huggingface_hub>=0.27.0",
         "safetensors>=0.5.0",
         "pyyaml>=6.0",
         "sentencepiece",
-        gpu="A10G",
     )
     .env({"HF_HOME": "/vol/data/hf-cache", "TRANSFORMERS_CACHE": "/vol/data/hf-cache"})
     .add_local_dir(str(_SCRIPTS_DIR), remote_path="/root/scripts")
@@ -193,7 +192,7 @@ def export_model(config: str = "eval_export.yaml") -> str:
     image=image,
     secrets=[hf_secret],
     gpu=DEFAULT_GPU,
-    timeout=DEFAULT_TIMEOUT * 4,
+    timeout=min(int(DEFAULT_TIMEOUT * 4), 86400),
     volumes={str(VOL_ROOT): volume},
 )
 def run_full_pipeline() -> dict[str, str]:
@@ -205,7 +204,9 @@ def run_full_pipeline() -> dict[str, str]:
     from train_grpo import run_grpo
     from train_sft import run_sft
 
-    stages = _pipeline.get("stages", ["sft_agent.yaml", "sft_code.yaml", "dpo.yaml", "grpo.yaml"])
+    stages = _pipeline.get(
+        "pipeline_stages", ["sft_agent.yaml", "sft_code.yaml", "dpo.yaml", "grpo.yaml"]
+    )
     download_base(DEFAULT_MODEL)
     volume.commit()
 
@@ -217,7 +218,7 @@ def run_full_pipeline() -> dict[str, str]:
         "grpo.yaml": lambda c: run_grpo(c, volume=volume),
     }
     for cfg_name in stages:
-        print(f"\n{'='*60}\nStage: {cfg_name}\n{'='*60}")
+        print(f"\n{'=' * 60}\nStage: {cfg_name}\n{'=' * 60}")
         cfg = load_config(_config_path(cfg_name))
         runner = runners.get(Path(cfg_name).name)
         if not runner:

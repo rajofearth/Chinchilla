@@ -24,7 +24,7 @@
 
 model_id: LiquidAI/LFM2.5-8B-A1B
 
-stages:
+pipeline_stages:
   - sft_agent.yaml
   - sft_code.yaml
   - dpo.yaml
@@ -32,6 +32,6 @@ stages:
 
 modal:
   app_name: mars-lfm-train
-  gpu: A10G
-  timeout_hours: 14
+  gpu: A100-80GB
+  timeout_hours: 20
   volume: mars-train-vol

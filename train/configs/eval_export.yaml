@@ -9,6 +9,6 @@ previous_stage:
   project_name: mars_grpo
 
 export_name: Mars-1.0-8B-A1B
-# hf_repo: YOUR_ORG/Mars-1.0-8B-A1B  # uncomment to push
+hf_repo: rajofearth/mars-1.0-8b-a1b  # uncomment to push
 
 source_stage: grpo

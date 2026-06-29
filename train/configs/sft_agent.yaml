@@ -9,6 +9,7 @@ model_id: LiquidAI/LFM2.5-8B-A1B
 
 dataset:
   seed: 42
+  force_rebuild: false
   # limit: 500  # smoke test
   mix:
     - name: synth_apigen
@@ -35,8 +36,9 @@ peft:
 
 training:
   num_train_epochs: 1
-  per_device_train_batch_size: 1
-  gradient_accumulation_steps: 16
+  per_device_train_batch_size: 8 # A100-80GB: 8× parallel vs 1 on A10
+  gradient_accumulation_steps: 2 # keep effective batch = 16 (8 × 2)
+  resume_from_checkpoint: /vol/checkpoints/sft/mars_sft_agent/20260627_174008/checkpoint-5400
   learning_rate: 2.0e-4
   lr_scheduler_type: cosine
   warmup_ratio: 0.03
@@ -49,6 +51,6 @@ training:
 
 modal:
   app_name: mars-lfm-train
-  gpu: A10G
-  timeout_hours: 14
+  gpu: A100-80GB # 3.4× bandwidth, 80GB VRAM
+  timeout_hours: 20
   volume: mars-train-vol
