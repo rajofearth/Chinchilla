@@ -1,0 +1,9 @@
+# Eval config for SFT agent final checkpoint
+# Run: modal run train/modal_app.py --stage eval --config sft_agent_eval.yaml
+
+project_name: mars_sft_agent
+model_id: LiquidAI/LFM2.5-8B-A1B
+stage_label: sft_agent_final
+
+# Point directly to the final SFT adapter on the volume
+adapter_path: /vol/checkpoints/sft/mars_sft_agent/20260705_112528/final

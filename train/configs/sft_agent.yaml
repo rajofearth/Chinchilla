@@ -38,7 +38,7 @@ training:
   num_train_epochs: 1
   per_device_train_batch_size: 8 # A100-80GB: 8× parallel vs 1 on A10
   gradient_accumulation_steps: 2 # keep effective batch = 16 (8 × 2)
-  resume_from_checkpoint: /vol/checkpoints/sft/mars_sft_agent/20260627_174008/checkpoint-5400
+  resume_from_checkpoint: /vol/checkpoints/sft/mars_sft_agent/20260629_181848/checkpoint-14600
   learning_rate: 2.0e-4
   lr_scheduler_type: cosine
   warmup_ratio: 0.03
