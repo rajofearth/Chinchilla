@@ -30,7 +30,9 @@ HERMES_TOOL_RESPONSE_RE = re.compile(
     r"<tool_response>\s*(.*?)\s*</tool_response>",
     re.DOTALL,
 )
-THINKING_RE = re.compile(r"<\s*redacted_thinking\s*>.*?</\s*redacted_thinking\s*>", re.DOTALL)
+THINKING_RE = re.compile(
+    r"<\s*redacted_thinking\s*>.*?</\s*redacted_thinking\s*>", re.DOTALL
+)
 
 
 def _pythonic_args(arguments: dict[str, Any]) -> str:
@@ -185,8 +187,20 @@ def _load_source(name: str, spec: dict[str, Any]) -> Dataset:
     return ds
 
 
-def format_codefeedback_row(row: dict[str, Any]) -> dict[str, list[dict[str, str]]] | None:
-    """HuggingFaceH4/codefeedback-filtered → messages."""
+def format_codefeedback_row(
+    row: dict[str, Any],
+) -> dict[str, list[dict[str, str]]] | None:
+    """HuggingFaceH4/Code-Feedback → messages.
+
+    The dataset has a pre-formatted `messages` column already in OpenAI
+    chat format (user/assistant turns). Falls back to instruction/answer
+    columns if messages is missing.
+    """
+    messages = row.get("messages")
+    if messages:
+        normalized = normalize_messages(messages)
+        if len(normalized) >= 2:
+            return {"messages": normalized}
     instruction = row.get("instruction") or row.get("query")
     answer = row.get("answer") or row.get("response")
     if not instruction or not answer:
@@ -220,7 +234,9 @@ def _format_source(name: str, ds: Dataset) -> Dataset:
     return Dataset.from_list(formatted)
 
 
-def _sample_by_weight(datasets: list[tuple[Dataset, float]], total: int, seed: int) -> Dataset:
+def _sample_by_weight(
+    datasets: list[tuple[Dataset, float]], total: int, seed: int
+) -> Dataset:
     weights = [w for _, w in datasets]
     weight_sum = sum(weights)
     counts = [max(1, int(total * w / weight_sum)) for w in weights]
@@ -259,5 +275,7 @@ def build_mixed_dataset(dataset_cfg: dict[str, Any]) -> Dataset:
 
     # No global limit — concatenate all sources scaled by relative weight caps.
     max_len = max(len(ds) for ds, _ in formatted_sets)
-    total = sum(int(max_len * w / sum(w for _, w in formatted_sets)) for _, w in formatted_sets)
+    total = sum(
+        int(max_len * w / sum(w for _, w in formatted_sets)) for _, w in formatted_sets
+    )
     return _sample_by_weight(formatted_sets, max(total, 1), seed)

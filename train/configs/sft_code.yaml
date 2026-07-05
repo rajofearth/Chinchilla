@@ -23,8 +23,8 @@ dataset:
       weight: 0.15
 
     - name: codefeedback
-      path: HuggingFaceH4/codefeedback-filtered
-      split: train
+      path: HuggingFaceH4/Code-Feedback
+      split: train_sft
       weight: 0.70
 
 peft:
