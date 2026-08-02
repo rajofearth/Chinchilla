@@ -261,12 +261,15 @@ def main(
     if fn is None:
         raise ValueError(f"Unknown stage {stage!r}. Choose from: {list(stage_map)}")
 
-    runner = fn.spawn if detach else fn.remote
+    # Always use .spawn(): spawned Function Calls are durable and are not
+    # canceled when the local caller disconnects (unlike .remote()). Combined
+    # with `modal run --detach`, long training runs survive terminal closes
+    # or the local client being killed. .get() blocks until the run finishes.
     with modal.enable_output():
         if stage == "full":
-            result = runner()
+            result = fn.spawn().get()
         else:
-            result = runner(config)
+            result = fn.spawn(config).get()
 
     if detach:
         print(f"Detached ({stage}) — monitor: modal app logs mars-lfm-train")

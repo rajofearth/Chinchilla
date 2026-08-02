@@ -39,6 +39,7 @@ training:
   gradient_checkpointing: true
   save_steps: 200
   save_total_limit: 3
+  resume_from_checkpoint: /vol/checkpoints/sft/mars_sft_code/20260705_141712/checkpoint-13400
 
 modal:
   gpu: A10G
