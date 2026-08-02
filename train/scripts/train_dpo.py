@@ -68,7 +68,6 @@ def run_dpo(cfg: dict[str, Any], *, volume: Any | None = None) -> Path:
         bf16=True,
         gradient_checkpointing=bool(training.get("gradient_checkpointing", True)),
         max_length=int(training.get("max_length", 4096)),
-        max_prompt_length=int(training.get("max_prompt_length", 2048)),
         report_to=training.get("report_to", "none"),
     )
 
