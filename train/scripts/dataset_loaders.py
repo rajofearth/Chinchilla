@@ -59,12 +59,26 @@ def _format_ultrafeedback_row(row: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _format_coding_pref_row(row: dict[str, Any]) -> dict[str, Any] | None:
-    """HuggingFaceH4/codefeedback-filtered → DPO pairs (concise correct vs verbose)."""
-    instruction = row.get("instruction") or row.get("query")
-    good = row.get("answer") or row.get("response")
+    """HuggingFaceH4/Code-Feedback → DPO pairs (concise correct vs verbose).
+
+    The dataset ships a pre-formatted `messages` column (user/assistant turns);
+    falls back to instruction/answer columns if messages is missing.
+    """
+    messages = row.get("messages")
+    if messages:
+        normalized = normalize_messages(messages)
+        user_msgs = [m for m in normalized if m["role"] == "user"]
+        asst_msgs = [m for m in normalized if m["role"] == "assistant"]
+        if not user_msgs or not asst_msgs:
+            return None
+        instruction = user_msgs[0]["content"]
+        good = asst_msgs[-1]["content"]
+    else:
+        instruction = row.get("instruction") or row.get("query")
+        good = row.get("answer") or row.get("response")
+        if not instruction or not good:
+            return None
     bad = row.get("bad_answer") or row.get("rejected")
-    if not instruction or not good:
-        return None
     if not bad:
         # Synthesize verbose/wrong rejected for alignment signal
         bad = good + "\n\nAdditionally, here's extra unrelated context and a potentially incorrect alternative approach."
