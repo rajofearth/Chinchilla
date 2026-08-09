@@ -28,6 +28,12 @@ Thumbs.db
 # Agent skill files (not project code)
 .agents/
 
+# Modal backup data (large; keep out of git — see modal-backup/README.md)
+modal-backup/checkpoints/
+modal-backup/tokenized/
+modal-backup/evals/
+modal-backup/*.log
+
 # Environment files
 .env
 .env.local
