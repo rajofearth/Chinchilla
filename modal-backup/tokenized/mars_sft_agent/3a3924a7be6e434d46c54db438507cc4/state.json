@@ -1,0 +1,32 @@
+{
+  "_data_files": [
+    {
+      "filename": "data-00000-of-00006.arrow"
+    },
+    {
+      "filename": "data-00001-of-00006.arrow"
+    },
+    {
+      "filename": "data-00002-of-00006.arrow"
+    },
+    {
+      "filename": "data-00003-of-00006.arrow"
+    },
+    {
+      "filename": "data-00004-of-00006.arrow"
+    },
+    {
+      "filename": "data-00005-of-00006.arrow"
+    }
+  ],
+  "_fingerprint": "ab26ba7a8d9c3d10",
+  "_format_columns": [
+    "attention_mask",
+    "input_ids",
+    "labels"
+  ],
+  "_format_kwargs": {},
+  "_format_type": null,
+  "_output_all_columns": false,
+  "_split": null
+}

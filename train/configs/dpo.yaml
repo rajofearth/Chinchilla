@@ -37,6 +37,7 @@ training:
   gradient_checkpointing: true
   save_steps: 200
   save_total_limit: 3
+  resume_from_checkpoint: /vol/checkpoints/dpo/mars_dpo/20260803_030359/checkpoint-1400
 
 modal:
   gpu: A10G

@@ -1,0 +1,76 @@
+{
+  "stage": "sft_code_final",
+  "project_name": "mars_sft_code",
+  "model_id": "LiquidAI/LFM2.5-8B-A1B",
+  "timestamp": "2026-08-02T16:16:37.678423+00:00",
+  "tool_eval": [
+    {
+      "query": "What's the weather in Boston?",
+      "expect_tool": "get_weather",
+      "hit": true,
+      "response": "<|tool_call_start|>[get_weather(location=\"Boston\")]<|tool_call_end|><|im_end|>"
+    },
+    {
+      "query": "Read the contents of config.yaml",
+      "expect_tool": "read_file",
+      "hit": true,
+      "response": "<|tool_call_start|>[read_file(path=\"config.yaml\")]<|tool_call_end|><|im_end|>"
+    }
+  ],
+  "qualitative": [
+    {
+      "question": "What is the capital of France?",
+      "response": "The answer to your question, it's Paris. I hope that information helps you in some way! Do have any other questions for me today? \n\n(I am an AI designed specifically as a language model and do not possess real-time data or internet access.)<|im_end|>"
+    },
+    {
+      "question": "Explain why the sky is blue in one paragraph.",
+      "response": "The reason for the color of our skies lies primarily with a phenomenon known as Rayleigh scattering, which occurs when sunlight interacts with particles and gases present within Earth's atmosphere.\n\nSunlight consists of different colors or wavelengths that are scattered by these atmospheric components to varying degrees depending on their size relative to those light waves' wavelength lengths\u2014shorter ones (blue) scatter more than longer ones (red). This differential scattering causes us to perceive an overall bluish hue across most parts of visible spectrum during daylight hours due predominantly from shorter-wavelength blues being redirected towards all directions rather than traveling straight through space unaltered like redder hues do\u2014which explains its dominance over other spectral ba"
+    },
+    {
+      "question": "Write a short poem about artificial intelligence.",
+      "response": "In circuits deep, where logic flows,\nA mind of metal starts to grow.\nWith algorithms and code so fine,\nIt learns from data's endless line.\n\nAs machines think in binary beat,\nThey mimic human thought complete.\nYet questions arise: what is real?\nIs consciousness just an illusion?\n\nThe future looms with promise bright,\nOf AI that can make us light.\nBut caution warns the wise:\nTo trust its power requires our eyes.<|im_end|>"
+    },
+    {
+      "question": "What is 15 \u00d7 37?",
+      "response": "To find the product of 15 and 37, we can use various methods. One approach involves breaking down one or both numbers into sums that are easier to multiply.\n\nWe know that multiplying by a number ending in zero simply adds zeros at the end of the other factor's result when multiplied together (for example, $20 \\times 3 = 60$). However, since neither our factors ends with zero, let's try another strategy: using distributive property over addition ($a(b+c) = ab + ac$).\n\nBreaking it up this way gives us:\n$15 \\times 37 = 15 \\times (30+7)$\n= $(15 \\times 30) + (15 \\times 7)$\n= $450 + 105$\n= $555$\n\nTherefore, the answer for what does not equal - no such thing exists here but rather equals $\\boxed{555}$.<|im_end|>"
+    },
+    {
+      "question": "Explain the difference between a CPU and a GPU in one sentence.",
+      "response": "A CPU is designed to execute multiple instructions sequentially, while a GPU can process many operations simultaneously across its thousands of cores for parallel processing tasks like graphics rendering or machine learning computations.<|im_end|>"
+    },
+    {
+      "question": "Write a Python function that checks if a string is a palindrome.",
+      "response": "Here's how you can implement it:\n\n```python\ndef check_palindrome(s):\n    s = s.lower().replace(' ', '')\n    return s == s[::-1]\n```\n\nThis code works by first converting the input string to lowercase and removing any spaces, then comparing this cleaned-up version of the original with its reverse (`s[::-1]`). If they're equal after these transformations, `check_palindrome` returns True; otherwise False.\n\nYou could also use regular expressions for more complex cases where non-alphanumeric characters need special handling (e.g., ignoring punctuation), but in most simple scenarios like checking whether \"madam\" or \"racecar\" are palindromes, simpler methods work fine too. \n\nFor example:\n```python\nimport re\n\ndef clean_string(s):\n    # Remove all alphanumeric symbols from the given text.\n    return"
+    },
+    {
+      "question": "How many 'r' are in the word 'strawberry'?",
+      "response": "The letter \"r\" appears 2 times. So, there are $\\boxed{2}$  letters that can be used to form a new number by removing one of them from strawberry and rearranging its digits: $3 \\times 10^5 + 6 \\times 10^4 + 8 \\times 10^3 + 1 \\times 10^2 + 0 \\times 10^1 + r \\times 10^0$. The answer is not uniquely determined without additional information about how numbers should be formed or what constraints apply when forming these numbers. Therefore, I cannot provide an exact solution with just this problem statement alone.\n\nIn conclusion:\n- There are two instances where we could use any digit as our base.\n- We have five different positions for each possible choice (from ten thousandths up to hundreds).\n\nThus, based on your specific question asking which position would yield exactly three distinct values "
+    },
+    {
+      "question": "What is the tallest mountain in the world?",
+      "response": "The highest point on Earth, and therefore its tallest peak, is Mount Everest. It stands at an elevation of approximately 8,848 meters (29,029 feet) above sea level when measured from base to summit using a survey conducted by China's State Geology Bureau in March 2020.\n\nHowever, it should be noted that this height can vary slightly depending on how one measures or defines \"base\" - some sources may use different methods for determining the exact location where the mountain meets the ocean floor as part of calculating total vertical relief. Nonetheless, most authoritative geographical organizations agree with these figures based on their surveys over time.\n \nMount Everest sits along the border between Nepal and Tibet Autonomous Region within the People\u2019s Republic of China. The Nepalese side "
+    },
+    {
+      "question": "Explain quantum computing in simple terms.",
+      "response": "Quantum computing is a type of computer that uses the principles of quantum mechanics to process information, which allows it to solve certain types of problems much faster than traditional computers can.\n\nIn classical computing, bits are used as basic units of data and they have only two possible states: 0 or 1. Quantum computing however utilizes qubits (quantum bits) instead of regular binary digits called \"bits\". A single bit has just one state at any given moment - either on or off; whereas each Qubit exists simultaneously with both possibilities until measured due to its inherent superposition property within physics laws governing subatomic particles like electrons & photons etc.\n\nQubits also exhibit entanglement \u2013 when you measure them together their properties become intertwined su"
+    },
+    {
+      "question": "What are the three branches of the US government?",
+      "response": "The United States has a system of checks and balances, with power divided among three main branches: legislative (Congress), executive (President), and judicial (Supreme Court). The Congress is responsible for making laws through its two chambers - the House of Representatives and the Senate. It also holds authority over matters such as declaring war.\n\nIn contrast to these other powers, it's worth noting that while each branch can exercise some oversight on others in certain areas like impeachment or confirmation hearings, they maintain distinct roles within their respective spheres under our constitutional framework. This division allows them to check one another without compromising essential functions inherent at different levels of governance. \n\nAdditionally, there have been discussion"
+    },
+    {
+      "question": "Write a haiku about the ocean.",
+      "response": "Blue waves dance and play,\nSalty breeze whispers through trees,\nOcean's heart beats strong.<|im_end|>"
+    },
+    {
+      "question": "Respond with exactly one sentence: why is open-source software valuable?",
+      "response": "Open-source software offers transparency, flexibility and cost savings by allowing users to modify the source code.<|im_end|>"
+    }
+  ],
+  "tool_format_scores": {
+    "lfm_tool_format_mean": 1.0,
+    "tool_json_args_mean": 1.0,
+    "samples": 2
+  },
+  "tool_eval_accuracy": 1.0
+}

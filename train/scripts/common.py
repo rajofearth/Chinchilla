@@ -27,6 +27,27 @@ def _patched_wc_init(self, *args, **kwargs):
 
 _peft_twc.WeightConverter.__init__ = _patched_wc_init
 
+# transformers >=5.12 dispatches LFM2 MoE experts to `grouped_mm`, whose
+# torch.nn.functional.grouped_mm kernel crashes with torch 2.12 (CUDA illegal memory
+# access on A100). The `batched_mm` alternative gathers per-token expert weights and
+# OOMs on 80 GB. Force transformers' own `grouped_mm_fallback` custom op (per-expert
+# torch.mm) instead — memory-efficient, no buggy kernel.
+try:
+    import transformers.integrations.moe as _transformers_moe
+
+    if hasattr(_transformers_moe, "_grouped_mm"):
+        _orig_transformers_grouped_mm = _transformers_moe._grouped_mm
+
+        def _safe_grouped_mm(input_, weight, offs):
+            return torch.ops.transformers.grouped_mm_fallback(
+                input_.to(weight.dtype), weight, offs=offs
+            )
+
+        _transformers_moe._grouped_mm = _safe_grouped_mm
+except Exception:
+    # Grouped-mm fallback unavailable; training will surface the underlying error.
+    pass
+
 import torch
 import yaml
 from datasets import Dataset, load_from_disk
