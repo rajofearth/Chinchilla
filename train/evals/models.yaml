@@ -1,0 +1,27 @@
+# Local llama.cpp model matrix. Paths are Windows paths and can be overridden per machine.
+base:
+  id: base
+  label: LFM2.5-8B-A1B base
+  model: C:\\Users\\Yashraj\\.cache\\huggingface\\hub\\models--LiquidAI--LFM2.5-8B-A1B-GGUF\\snapshots\\dfd5fdcad7a1c0d31473fb4ca443b8befbacddf0\\LFM2.5-8B-A1B-Q4_K_M.gguf
+  lora: null
+models:
+  - id: base
+    label: Base
+  - id: grpo-5400
+    label: GRPO checkpoint 5400
+    lora: modal-backup/checkpoints/rl/mars_grpo/20260812_145944/checkpoint-5400/mars-grpo-checkpoint-5400-f16.gguf
+  - id: grpo-5500
+    label: GRPO checkpoint 5500
+    lora: modal-backup/checkpoints/rl/mars_grpo/20260812_145944/checkpoint-5500/mars-grpo-checkpoint-5500-f16.gguf
+  - id: grpo-5600
+    label: GRPO checkpoint 5600
+    lora: modal-backup/checkpoints/rl/mars_grpo/20260812_145944/checkpoint-5600/mars-grpo-checkpoint-5600-f16.gguf
+server:
+  executable: P:\\Applications\\llamacpp\\llama-server.exe
+  host: 127.0.0.1
+  port: 18080
+  ctx_size: 4096
+  threads: 8
+  max_tokens: 128
+  temperature: 0.2
+  seed: 42

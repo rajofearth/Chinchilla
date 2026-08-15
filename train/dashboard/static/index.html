@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mars Evaluation Dashboard</title>
+<style>
+body{font:14px system-ui;margin:0;background</head></style>:#0e1117;color:#e6edf3}header{padding:18px 28px;background:#161b22;display:flex;justify-content:space-between}main{padding:24px;max-width:1600px;margin:auto}.toolbar,.panel{background:#161b22;padding:16px;border-radius:8px;margin-top:18px}.toolbar{display:flex;gap:15px;align-items:center;flex-wrap:wrap}button{padding:9px 14px;border:0;border-radius:5px;background:#3578e5;color:#fff;cursor:pointer}select{background:#21262d;color:#fff;padding:8px;border:1px solid #444c56}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #30363d;text-align:left;vertical-align:top}th{color:#8b949e}.pass{color:#3fb950;font-weight:600}.fail{color:#f85149;font-weight:600}.muted{color:#8b949e}.bar{height:14px;background:#21262d;border-radius:4px;min-width:80px;margin:4px 0}.bar i{display:block;height:100%;background:#3578e5;border-radius:4px}.response{white-space:pre-wrap;max-width:650px;max-height:260px;overflow:auto}.history button{background:none;color:#58a6ff;padding:2px}
+</style>
+</head>
+<body>
+<header><b>Mars Evaluation Dashboard</b><span id="status" class="muted">idle</span></header>
+<main>
+<section class="toolbar">
+<label>Models<br><select id="models" multiple size="4"></select></label>
+<button id="run">Run selected models</button><button id="refresh">Refresh history</button>
+<span class="muted">Each model loads once; each case is a fresh stateless OpenAI request.</span>
+</section>
+<section class="panel"><h2>Current run summary</h2><div id="summary" class="muted">No active run.</div><div id="charts"></div></section>
+<section class="panel"><h2>Live activity</h2><div id="live" class="muted">Prompt and streamed response will appear here.</div></section>
+<section class="panel"><h2>All test results</h2><table><thead><tr><th>Model</th><th>Case</th><th>Status</th><th>Pass</th><th>Timing</th><th>Tokens</th><th>Explanation / response</th></tr></thead><tbody id="results"></tbody></table></section>
+<section class="panel"><h2>Past runs</h2><div id="history" class="history muted">Loading...</div></section>
+</main>
+<script>
+const $ = (x) => document.querySelector(x);
+const models = $('#models'), results = $('#results'), live = $('#live'), summary = $('#summary');
+let rows = {};
+function esc(x) { return String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function addRow(model, caseId) {
+  const key = model + '|' + caseId;
+  if (rows[key]) return rows[key];
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${esc(model)}</td><td>${esc(caseId)}</td><td class="state">running</td><td class="score">—</td><td class="timing">—</td><td class="tokens">—</td><td class="response"></td>`;
+  results.append(tr); rows[key] = tr; return tr;
+}
+function finish(x) {
+  const tr = addRow(x.model, x.case);
+  tr.querySelector('.state').textContent = 'completed';
+  tr.querySelector('.score').innerHTML = x.score.pass ? '<span class="pass">PASS</span>' : '<span class="fail">FAIL</span>';
+  const m = x.metrics || {};
+  tr.querySelector('.timing').textContent = `${m.elapsed_ms ?? '—'} ms / TTFT ${m.ttft_ms ?? '—'} ms / ${m.tok_per_sec ?? '—'} tok/s`;
+  tr.querySelector('.tokens').textContent = `in ${m.prompt_tokens ?? '—'} / out ${m.completion_tokens ?? '—'}`;
+  tr.querySelector('.response').textContent = (x.score.explanation || '') + '\n' + x.response;
+}
+async function refresh() {
+  const h = await (await fetch('/api/runs')).json();
+  const target = $('#history'); target.textContent = '';
+  if (!h.runs.length) { target.textContent = 'No completed runs.'; return; }
+  for (const r of h.runs) {
+    const div = document.createElement('div'), button = document.createElement('button');
+    button.textContent = r.run_id; button.onclick = () => loadRun(r.run_id);
+    div.append(button, ` ${r.models.join(', ')} — ${r.status}`); target.append(div);
+  }
+}
+async function run() {
+  results.innerHTML = ''; rows = {}; $('#status').textContent = 'running';
+  const selected = [...models.selectedOptions].map(x => x.value);
+  const response = await fetch('/api/runs', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({models:selected})});
+  const started = await response.json(), events = new EventSource(started.events_url);
+  events.onmessage = (event) => {
+    const x = JSON.parse(event.data);
+    if (x.type === 'prompt') { addRow(x.model,x.case).querySelector('.response').textContent='PROMPT: '+x.prompt; live.textContent=x.model+' / '+x.case+'\n'+x.prompt; }
+    if (x.type === 'delta') { const tr=addRow(x.model,x.case); tr.querySelector('.response').textContent += x.text; live.textContent=x.model+' / '+x.case+'\n'+tr.querySelector('.response').textContent; }
+    if (x.type === 'finished') finish(x);
+    if (x.type === 'case_error') { const tr=addRow(x.model,x.case); tr.querySelector('.state').textContent='error'; tr.querySelector('.state').className='fail'; tr.querySelector('.response').textContent=x.error; }
+    if (x.type === 'run_finished') { $('#status').textContent='finished'; events.close(); refresh(); loadRun(started.run_id); }
+  };
+}
+async function loadRun(id) {
+  const d = await (await fetch('/api/runs/'+encodeURIComponent(id))).json();
+  results.innerHTML=''; rows={};
+  for (const m of d.models || []) for (const r of m.responses || []) finish({model:m.id,case:r.case_id,response:r.text||r.error||'',score:r.score||{pass:false,explanation:r.error||''},metrics:r});
+  const entries=Object.entries(d.summary||{});
+  summary.innerHTML='<table><tr><th>Model</th><th>Passed</th><th>Pass rate</th><th>Elapsed</th><th>Avg TTFT</th><th>Tokens</th><th>Tok/s</th></tr>'+entries.map(([id,s])=>`<tr><td>${esc(id)}</td><td>${s.passed}/${s.total}</td><td>${((s.pass_rate||0)*100).toFixed(1)}%</td><td>${s.elapsed_ms??'—'} ms</td><td>${s.avg_ttft_ms??'—'} ms</td><td>${s.prompt_tokens??'—'} in / ${s.completion_tokens??'—'} out</td><td>${s.tok_per_sec??'—'}</td></tr>`).join('')+'</table>';
+  const max=Math.max(1,...entries.map(([,s])=>s.tok_per_sec||0));
+  $('#charts').innerHTML='<h3></h3>Visual comparison</h3>'+entries.map(([id,s])=>`<div>${esc(id)} — pass ${((s.pass_rate||0)*100).toFixed(1)}%<div class="bar"><i style="width:${(s.pass_rate||0)*100}%"></i></div>speed ${s.tok_per_sec??'—'} tok/s<div class="bar"><i style="width:${((s.tok_per_sec||0)/max)*100}%"></i></div></div>`).join('<br>');
+}
+$('#run').onclick=run; $('#refresh').onclick=refresh;
+(async function init(){ const m=await (await fetch('/api/models')).json(); models.innerHTML=m.models.map(x=>`<option value="${esc(x.id)}" selected>${esc(x.label)}</option>`).join(''); refresh(); })();
+</script>
+</body>
+</html>

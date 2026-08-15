@@ -4,9 +4,11 @@ Matches notes.md §9:
   /vol/bases, /vol/checkpoints/{sft,dpo,rl}, /vol/data, /vol/exports, /vol/evals
 """
 
+import os
 from pathlib import Path
 
-VOL_ROOT = Path("/vol")
+# Modal mounts the volume at /vol; local runs can override this without changing configs.
+VOL_ROOT = Path(os.environ.get("MARS_VOL_ROOT", "/vol"))
 
 BASES_DIR = VOL_ROOT / "bases"
 CHECKPOINTS_DIR = VOL_ROOT / "checkpoints"

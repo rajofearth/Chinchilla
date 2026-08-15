@@ -1,6 +1,12 @@
-# Benchmark suites for Mars-1.0 regression tracking (run after each stage)
+# Canonical smoke suites for Mars-1.0 checkpoint regression tracking.
+# The persistent local OpenAI-compatible runner is train/scripts/eval_runner.py.
+# This file describes metric intent; exact prompts live in cases/*.json.
 
-baseline_model: LiquidAI/LFM2.5-8B-A1B
+baseline:
+  model_id: LiquidAI/LFM2.5-8B-A1B
+  variant: instruct
+  runtime: llama.cpp GGUF
+  quantization: Q4_K_M
 
 suites:
   agent_tools:
@@ -18,14 +24,14 @@ suites:
     regression_threshold: -0.05
 
   qualitative:
-    description: 12-question suite from nanochat comparison methodology
-    source: archive/nanochat_modal/docs/COMPARISON.md
-    count: 12
+    description: Versioned qualitative regression prompts
+    source: train/evals/cases/smoke_v1.json
+    count: 4
 
   coding:
-    description: HumanEval pass@1 (GRPO reward stage)
+    description: Coding smoke checks; not executable HumanEval
     metrics:
-      - humaneval_pass_at_1
+      - python_function_shape_rate
     stretch_goal: +0.05
 
   agent_harness_targets:
@@ -36,4 +42,4 @@ suites:
       - OpenAI-compatible APIs (vLLM lfm2 parser)
       - LM Studio / llama.cpp (post-export GGUF)
 
-eval_output: /vol/evals/
+eval_output: train/evals/results/
