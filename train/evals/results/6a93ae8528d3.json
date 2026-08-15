@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "run_id": "2979954e9913",
+  "models": [
+    {
+      "id": "base",
+      "label": "Base",
+      "responses": [],
+      "error": "llama-server exited with 1",
+      "totals": {
+        "passed": 0,
+        "completed": 0,
+        "failed": 11,
+        "total": 11,
+        "pass_rate": 0.0,
+        "elapsed_ms": 0,
+        "generation_ms": 0,
+        "avg_ttft_ms": 0.0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null,
+        "tok_per_sec": null,
+        "token_coverage": 0
+      }
+    },
+    {
+      "id": "grpo-5400",
+      "label": "GRPO checkpoint 5400",
+      "responses": [],
+      "error": "llama-server exited with 1",
+      "totals": {
+        "passed": 0,
+        "completed": 0,
+        "failed": 11,
+        "total": 11,
+        "pass_rate": 0.0,
+        "elapsed_ms": 0,
+        "generation_ms": 0,
+        "avg_ttft_ms": 0.0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null,
+        "tok_per_sec": null,
+        "token_coverage": 0
+      }
+    },
+    {
+      "id": "grpo-5500",
+      "label": "GRPO checkpoint 5500",
+      "responses": [],
+      "error": "llama-server exited with 1",
+      "totals": {
+        "passed": 0,
+        "completed": 0,
+        "failed": 11,
+        "total": 11,
+        "pass_rate": 0.0,
+        "elapsed_ms": 0,
+        "generation_ms": 0,
+        "avg_ttft_ms": 0.0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null,
+        "tok_per_sec": null,
+        "token_coverage": 0
+      }
+    },
+    {
+      "id": "grpo-5600",
+      "label": "GRPO checkpoint 5600",
+      "responses": [],
+      "error": "llama-server exited with 1",
+      "totals": {
+        "passed": 0,
+        "completed": 0,
+        "failed": 11,
+        "total": 11,
+        "pass_rate": 0.0,
+        "elapsed_ms": 0,
+        "generation_ms": 0,
+        "avg_ttft_ms": 0.0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null,
+        "tok_per_sec": null,
+        "token_coverage": 0
+      }
+    }
+  ],
+  "cases": [],
+  "summary": {
+    "base": {
+      "passed": 0,
+      "completed": 0,
+      "failed": 11,
+      "total": 11,
+      "pass_rate": 0.0,
+      "elapsed_ms": 0,
+      "generation_ms": 0,
+      "avg_ttft_ms": 0.0,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "tok_per_sec": null,
+      "token_coverage": 0
+    },
+    "grpo-5400": {
+      "passed": 0,
+      "completed": 0,
+      "failed": 11,
+      "total": 11,
+      "pass_rate": 0.0,
+      "elapsed_ms": 0,
+      "generation_ms": 0,
+      "avg_ttft_ms": 0.0,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "tok_per_sec": null,
+      "token_coverage": 0
+    },
+    "grpo-5500": {
+      "passed": 0,
+      "completed": 0,
+      "failed": 11,
+      "total": 11,
+      "pass_rate": 0.0,
+      "elapsed_ms": 0,
+      "generation_ms": 0,
+      "avg_ttft_ms": 0.0,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "tok_per_sec": null,
+      "token_coverage": 0
+    },
+    "grpo-5600": {
+      "passed": 0,
+      "completed": 0,
+      "failed": 11,
+      "total": 11,
+      "pass_rate": 0.0,
+      "elapsed_ms": 0,
+      "generation_ms": 0,
+      "avg_ttft_ms": 0.0,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "tok_per_sec": null,
+      "token_coverage": 0
+    }
+  }
+}
