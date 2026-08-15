@@ -1,43 +1,101 @@
 """Persistent llama-server/OpenAI evaluation runner for Mars checkpoints."""
 from __future__ import annotations
-import argparse, json, os, re, subprocess, time, uuid
+import argparse, json, os, re, subprocess, threading, time, uuid
 from pathlib import Path
 from urllib.request import Request, urlopen
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def _normalize_windows_path(value: str) -> str:
+    # YAML often stores `C:\\Users\\...`; collapse that before conversion.
+    return os.path.expandvars(value).replace("\\\\", "\\")
+
 def _path(value: str | None) -> Path | None:
+    """Resolve a manifest path for Python (WSL `/mnt/<drive>/...` when needed)."""
     if not value: return None
-    value = os.path.expandvars(value)
+    value = _normalize_windows_path(value)
     # Permit the same manifest from WSL and Windows. WSL can launch .exe files
     # through /mnt/<drive>, while Windows retains drive-letter paths.
-    if os.name != "nt" and re.match(r"^[A-Za-z]:[\\\\/]", value):
-        value = "/mnt/" + value[0].lower() + value[2:].replace("\\\\", "/").replace("\\", "/")
+    if os.name != "nt" and re.match(r"^[A-Za-z]:[\\/]", value):
+        value = "/mnt/" + value[0].lower() + value[2:].replace("\\", "/")
     p = Path(value)
     return p if p.is_absolute() else ROOT.parent / p
+
+def _native_arg(path: Path | None, exe: Path) -> str | None:
+    """Arguments for a Windows .exe must stay Windows paths even when Python is on WSL."""
+    if path is None: return None
+    if os.name != "nt" and str(exe).lower().endswith(".exe"):
+        posix = str(path).replace("\\", "/")
+        match = re.match(r"^/mnt/([a-zA-Z])/(.*)$", posix)
+        if match:
+            return match.group(1).upper() + ":\\" + match.group(2).replace("/", "\\")
+    return str(path)
+
+def _health_hosts() -> list[str]:
+    hosts = ["127.0.0.1"]
+    try:
+        out = subprocess.check_output(["ip", "route", "show", "default"], text=True, timeout=2)
+        parts = out.split()
+        if "via" in parts:
+            gateway = parts[parts.index("via") + 1]
+            if gateway not in hosts:
+                hosts.append(gateway)
+    except Exception:
+        pass
+    return hosts
 
 class LlamaServer:
     def __init__(self, cfg: dict, model: dict, port: int):
         self.cfg, self.model, self.port = cfg, model, port
         self.process = None
+        self.log: list[str] = []
+        self.client_host = "127.0.0.1"
     def start(self):
         exe = _path(self.cfg["server"]["executable"])
         base = _path(self.cfg["base"]["model"])
         lora = _path(self.model.get("lora"))
+        if not exe or not exe.exists(): raise FileNotFoundError(f"llama-server missing: {exe}")
         if not base or not base.exists(): raise FileNotFoundError(f"base GGUF missing: {base}")
         if lora and not lora.exists(): raise FileNotFoundError(f"LoRA GGUF missing: {lora}")
-        cmd = [exe, "--model", str(base), "--host", self.cfg["server"].get("host", "127.0.0.1"), "--port", str(self.port), "--alias", self.model["id"], "--ctx-size", str(self.cfg["server"].get("ctx_size", 4096)), "--threads", str(self.cfg["server"].get("threads", 8)), "--parallel", "1", "--no-cont-batching", "--jinja", "--metrics"]
-        if lora: cmd += ["--lora", str(lora)]
-        self.process = subprocess.Popen([str(x) for x in cmd], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+        windows_exe = os.name != "nt" and str(exe).lower().endswith(".exe")
+        bind_host = "0.0.0.0" if windows_exe else self.cfg["server"].get("host", "127.0.0.1")
+        cmd = [
+            str(exe), "--model", _native_arg(base, exe),
+            "--host", bind_host, "--port", str(self.port),
+            "--alias", self.model["id"], "--ctx-size", str(self.cfg["server"].get("ctx_size", 4096)),
+            "--threads", str(self.cfg["server"].get("threads", 8)), "--parallel", "1",
+            "--no-cont-batching", "--jinja", "--metrics",
+        ]
+        if lora: cmd += ["--lora", _native_arg(lora, exe)]
+        self.log = []
+        self.process = subprocess.Popen(
+            [str(x) for x in cmd], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", cwd=str(exe.parent),
+        )
+        def _drain():
+            if not self.process.stdout: return
+            for line in self.process.stdout:
+                self.log.append(line)
+        threading.Thread(target=_drain, daemon=True).start()
         deadline = time.time() + 180
+        hosts = _health_hosts()
         while time.time() < deadline:
-            try:
-                with urlopen(f"http://127.0.0.1:{self.port}/health", timeout=2) as r:
-                    if r.status in (200, 204): return
-            except Exception: time.sleep(1)
-            if self.process.poll() is not None: raise RuntimeError(f"llama-server exited with {self.process.returncode}")
-        raise TimeoutError("llama-server readiness timeout")
+            for host in hosts:
+                try:
+                    with urlopen(f"http://{host}:{self.port}/health", timeout=2) as r:
+                        if r.status in (200, 204):
+                            self.client_host = host
+                            return
+                except Exception:
+                    pass
+            time.sleep(1)
+            if self.process.poll() is not None:
+                time.sleep(0.2)
+                tail = "".join(self.log[-30:]).strip() or "no server log"
+                raise RuntimeError(f"llama-server exited with {self.process.returncode}: {tail[-1500:]}")
+        tail = "".join(self.log[-30:]).strip() or "no server log"
+        raise TimeoutError(f"llama-server readiness timeout on {hosts}: {tail[-1500:]}")
     def stop(self):
         if self.process and self.process.poll() is None:
             self.process.terminate()
@@ -45,7 +103,7 @@ class LlamaServer:
             except subprocess.TimeoutExpired: self.process.kill()
 
 class OpenAIClient:
-    def __init__(self, port: int): self.url = f"http://127.0.0.1:{port}/v1/chat/completions"
+    def __init__(self, port: int, host: str = "127.0.0.1"): self.url = f"http://{host}:{port}/v1/chat/completions"
     def stream(self, model: str, messages: list[dict], generation: dict, on_delta=None):
         body = {"model": model, "messages": messages, "stream": True, "stream_options": {"include_usage": True}, **generation}
         req = Request(self.url, data=json.dumps(body).encode(), headers={"Content-Type":"application/json"}, method="POST")
@@ -129,26 +187,28 @@ def _totals(responses, total):
         "tok_per_sec":tok_per_sec,"token_efficiency":token_efficiency,"token_coverage":len(valid_tokens),
     }
 
-def run(models_path: Path, cases_path: Path, selected=None, output=None, on_event=None):
+def run(models_path: Path, cases_path: Path, selected=None, output=None, on_event=None, run_id=None):
     cfg, models = load_matrix(models_path); cases = json.loads(cases_path.read_text())["cases"]
     if selected: models = [m for m in models if m["id"] in selected]
-    run_id = uuid.uuid4().hex[:12]; result={"schema_version":1,"run_id":run_id,"models":[],"cases":[]}
+    run_id = run_id or uuid.uuid4().hex[:12]; result={"schema_version":1,"run_id":run_id,"models":[],"cases":[]}
     port = int(cfg["server"].get("port",18080))
     for model in models:
         server=LlamaServer(cfg, model, port); model_result={"id":model["id"],"label":model["label"],"responses":[]}
         try:
             if on_event: on_event({"type":"model_start","model":model["id"]})
-            server.start(); client=OpenAIClient(port)
+            server.start(); client=OpenAIClient(port, server.client_host)
             for case in cases:
                 if on_event: on_event({"type":"prompt","model":model["id"],"case":case["id"],"prompt":case["messages"][-1]["content"]})
                 try:
                     got=client.stream(model["id"],case["messages"],{"temperature":cfg["server"].get("temperature",0.2),"seed":cfg["server"].get("seed",42),"max_tokens":cfg["server"].get("max_tokens",256)},lambda x: on_event({"type":"delta","model":model["id"],"case":case["id"],"text":x}) if on_event else None)
-                    got["case_id"]=case["id"]; got["suite"]=case.get("suite"); got["prompt"]=case["messages"][-1]["content"]; got["expect"]=case.get("expect", {}); got["status"]="completed"; got["score"]=score(case,got["text"]); model_result["responses"].append(got)
+                    got["case_id"]=case["id"]; got["suite"]=case.get("suite"); got["prompt"]=case["messages"][-1]["content"]; got["expect"]=case.get("expect", {}); got["status"]="completed"; got["score"]=score(case, got["text"] or got["reasoning"] or ""); model_result["responses"].append(got)
                     if on_event: on_event({"type":"finished","model":model["id"],"case":case["id"],"response":got["text"],"score":got["score"],"metrics":{k:got.get(k) for k in ("elapsed_ms","ttft_ms","generation_ms","prompt_tokens","completion_tokens","total_tokens","tok_per_sec","chars")}})
                 except Exception as exc:
                     error={"case_id":case["id"],"suite":case.get("suite"),"prompt":case["messages"][-1]["content"],"status":"error","error":str(exc)}; model_result["responses"].append(error)
                     if on_event: on_event({"type":"case_error","model":model["id"],"case":case["id"],"error":str(exc)})
-        except Exception as exc: model_result["error"]=str(exc)
+        except Exception as exc:
+            model_result["error"]=str(exc)
+            if on_event: on_event({"type":"model_error","model":model["id"],"error":str(exc)})
         finally: server.stop()
         model_result["totals"] = _totals(model_result["responses"], len(cases)); result["models"].append(model_result); port += 1
     result["summary"]={m["id"]:m["totals"] for m in result["models"]}

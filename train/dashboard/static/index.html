@@ -390,7 +390,7 @@ function candidateStats() {
     if (!by.has(r.cand)) by.set(r.cand, {
       id: r.cand, label: r.clabel, isBase: r.isBase,
       pass: 0, done: 0, toks: [], ttft: [], latency: [],
-      suiteMs: 0, genMs: 0, suiteTokens: 0, promptTokens: 0, estimated: false,
+      suiteMs: 0, genMs: 0, suiteTokens: 0, promptTokens: 0, estimated: false, errMsg: '',
     });
     const s = by.get(r.cand);
     if (r.pass != null) { s.done++; if (r.pass) s.pass++; }
@@ -402,6 +402,7 @@ function candidateStats() {
     if (Number.isFinite(r.tokens)) s.suiteTokens += r.tokens;
     if (Number.isFinite(r.promptTokens)) s.promptTokens += r.promptTokens;
     if (r.tokensEstimated) s.estimated = true;
+    if (r.err && r.text) s.errMsg = r.text.split('\n')[0].slice(0, 180);
   }
   const list = [...by.values()].map(s => {
     const rate = s.done ? s.pass / s.done : 0;
@@ -476,7 +477,7 @@ function renderLadder() {
       <div class="cand-status ${dir}"></div>
       <div>
         <div class="cand-name">${esc(c.label)} ${c.isBase ? '<span class="badge-base">BASE</span>' : ''}</div>
-        <div class="cand-sub">${c.pass}/${c.done} · ${fmt(Math.round(c.suiteTokens))}${c.estimated ? '~' : ''} tok · ${fmtMs(c.suiteMs)}</div>
+        <div class="cand-sub">${c.errMsg ? esc(c.errMsg) : `${c.pass}/${c.done} · ${fmt(Math.round(c.suiteTokens))}${c.estimated ? '~' : ''} tok · ${fmtMs(c.suiteMs)}`}</div>
       </div>
       <div>
         <div class="cand-rate" style="color:${color}">${pct(c.rate)}</div>
@@ -696,6 +697,14 @@ function ingestRun(data) {
   rows = [];
   selectedRow = null;
   for (const m of data.models || []) {
+    if (m.error && !(m.responses || []).length) {
+      rows.push({
+        cand: m.id, clabel: m.label || m.id, isBase: m.id === 'base',
+        case: 'server.start', category: 'server', pass: false, err: true, status: 'error',
+        latency: null, ttft: null, toks: NaN, tokens: null, promptTokens: null,
+        text: m.error, regression: false,
+      });
+    }
     for (const r of m.responses || []) {
       rows.push(normalizeRow(m, r, r.error ? 'error' : 'completed'));
     }
@@ -750,12 +759,15 @@ async function runSuite() {
   refreshViews();
   setLive('running');
   $('#runBtn').disabled = true;
+  let closed = false;
   try {
-    const d = await (await fetch('/api/runs', {
+    const res = await fetch('/api/runs', {
       method: 'POST',
       headers: {'content-type': 'application/json'},
       body: JSON.stringify({models: selected}),
-    })).json();
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.detail || d.message || 'failed to start run');
     $('#crumbRun').textContent = d.run_id;
     $('#stRun').textContent = d.run_id;
     eventSource = new EventSource(d.events_url);
@@ -775,25 +787,35 @@ async function runSuite() {
         upsertLive(normalizeRow({id: x.model, label: x.model}, {
           case_id: x.case, text: x.response, score: x.score, ...x.metrics, events: x.events,
         }, 'completed'));
-      } else if (x.type === 'case_error') {
+      } else if (x.type === 'case_error' || x.type === 'model_error') {
         upsertLive({
           cand: x.model, clabel: x.model, isBase: x.model === 'base',
-          case: x.case, category: categoryOf(x.case), pass: false, err: true,
-          status: 'error', text: x.error || 'error', regression: false,
+          case: x.case || 'server.start', category: x.case ? categoryOf(x.case) : 'server',
+          pass: false, err: true, status: 'error', text: x.error || 'error', regression: false,
         });
       } else if (x.type === 'run_finished') {
+        closed = true;
         eventSource.close();
         eventSource = null;
         setLive('finished');
-        loadRun(d.run_id).then(() => refresh().catch(() => {}));
+        loadRun(d.run_id).catch(err => { console.error(err); setLive('error'); });
       } else if (x.type === 'error') {
+        closed = true;
         setLive('error');
+        upsertLive({
+          cand: 'runner', clabel: 'runner', isBase: false, case: 'run', category: 'server',
+          pass: false, err: true, status: 'error', text: x.message || 'run error', regression: false,
+        });
       }
     };
-    eventSource.onerror = () => setLive('error');
+    eventSource.onerror = () => { if (!closed) setLive('error'); };
   } catch (err) {
     console.error(err);
     setLive('error');
+    upsertLive({
+      cand: 'runner', clabel: 'runner', isBase: false, case: 'run', category: 'server',
+      pass: false, err: true, status: 'error', text: String(err), regression: false,
+    });
   } finally {
     $('#runBtn').disabled = false;
   }

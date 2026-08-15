@@ -50,7 +50,7 @@ async def start(req: RunRequest):
         loop=asyncio.get_running_loop()
         def emit(event): asyncio.run_coroutine_threadsafe(q.put(event), loop)
         try:
-            await asyncio.to_thread(run, MODELS, CASES, req.models, RESULTS/f"{run_id}.json", emit)
+            await asyncio.to_thread(run, MODELS, CASES, req.models, RESULTS/f"{run_id}.json", emit, run_id)
             await q.put({"type":"run_finished","run_id":run_id})
         except Exception as exc: await q.put({"type":"error","run_id":run_id,"message":str(exc)})
     asyncio.create_task(work()); return {"run_id":run_id,"events_url":f"/api/runs/{run_id}/events"}
