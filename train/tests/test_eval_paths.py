@@ -31,3 +31,4 @@ def test_native_arg_keeps_posix_for_linux_binary(monkeypatch):
 
 def test_health_hosts_include_localhost():
     assert "127.0.0.1" in _health_hosts()
+    assert all(not h.startswith("10.255.") for h in _health_hosts())

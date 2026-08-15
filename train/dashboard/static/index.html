@@ -530,7 +530,7 @@ function heatColor(v) {
 
 function renderHeatmap() {
   const list = candidates.length ? candidates : candidateStats();
-  const cats = [...new Set(rows.map(r => r.category))].sort();
+  const cats = [...new Set(rows.map(r => r.category).filter(c => c && c !== 'startup'))].sort();
   if (!list.length || !cats.length) {
     $('#heatmap').innerHTML = '<tr><td class="empty">No coverage yet.</td></tr>';
     return;
@@ -700,7 +700,7 @@ function ingestRun(data) {
     if (m.error && !(m.responses || []).length) {
       rows.push({
         cand: m.id, clabel: m.label || m.id, isBase: m.id === 'base',
-        case: 'server.start', category: 'server', pass: false, err: true, status: 'error',
+        case: 'server.start', category: 'startup', pass: false, err: true, status: 'error',
         latency: null, ttft: null, toks: NaN, tokens: null, promptTokens: null,
         text: m.error, regression: false,
       });
@@ -790,7 +790,7 @@ async function runSuite() {
       } else if (x.type === 'case_error' || x.type === 'model_error') {
         upsertLive({
           cand: x.model, clabel: x.model, isBase: x.model === 'base',
-          case: x.case || 'server.start', category: x.case ? categoryOf(x.case) : 'server',
+          case: x.case || 'server.start', category: x.case ? categoryOf(x.case) : 'startup',
           pass: false, err: true, status: 'error', text: x.error || 'error', regression: false,
         });
       } else if (x.type === 'run_finished') {
@@ -803,7 +803,7 @@ async function runSuite() {
         closed = true;
         setLive('error');
         upsertLive({
-          cand: 'runner', clabel: 'runner', isBase: false, case: 'run', category: 'server',
+          cand: 'runner', clabel: 'runner', isBase: false, case: 'run', category: 'startup',
           pass: false, err: true, status: 'error', text: x.message || 'run error', regression: false,
         });
       }
@@ -813,7 +813,7 @@ async function runSuite() {
     console.error(err);
     setLive('error');
     upsertLive({
-      cand: 'runner', clabel: 'runner', isBase: false, case: 'run', category: 'server',
+      cand: 'runner', clabel: 'runner', isBase: false, case: 'run', category: 'startup',
       pass: false, err: true, status: 'error', text: String(err), regression: false,
     });
   } finally {

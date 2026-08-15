@@ -39,11 +39,46 @@ def _health_hosts() -> list[str]:
         parts = out.split()
         if "via" in parts:
             gateway = parts[parts.index("via") + 1]
-            if gateway not in hosts:
+            if gateway not in hosts and not gateway.startswith("10.255."):
                 hosts.append(gateway)
     except Exception:
         pass
     return hosts
+
+def _http_ok(host: str, port: int) -> bool:
+    url = f"http://{host}:{port}/health"
+    try:
+        with urlopen(url, timeout=2) as r:
+            if r.status in (200, 204):
+                return True
+    except Exception:
+        pass
+    for curl in ("curl.exe", "curl"):
+        try:
+            result = subprocess.run(
+                [curl, "-sS", "-m", "2", "-o", os.devnull, "-w", "%{http_code}", url],
+                capture_output=True, text=True, timeout=6,
+            )
+            if result.stdout.strip() in {"200", "204"}:
+                return True
+        except Exception:
+            continue
+    return False
+
+def _free_port(port: int) -> None:
+    """Drop a leftover Windows llama-server still bound to the eval port."""
+    try:
+        out = subprocess.check_output(["netstat.exe", "-ano"], text=True, errors="replace", timeout=8)
+    except Exception:
+        return
+    pids = set()
+    for line in out.splitlines():
+        if f":{port}" in line and "LISTENING" in line.upper():
+            pid = line.split()[-1]
+            if pid.isdigit() and pid != "0":
+                pids.add(pid)
+    for pid in pids:
+        subprocess.run(["taskkill.exe", "/F", "/PID", pid], capture_output=True, timeout=8)
 
 class LlamaServer:
     def __init__(self, cfg: dict, model: dict, port: int):
@@ -60,6 +95,8 @@ class LlamaServer:
         if lora and not lora.exists(): raise FileNotFoundError(f"LoRA GGUF missing: {lora}")
         windows_exe = os.name != "nt" and str(exe).lower().endswith(".exe")
         bind_host = "0.0.0.0" if windows_exe else self.cfg["server"].get("host", "127.0.0.1")
+        timeout = int(self.cfg["server"].get("ready_timeout", 600))
+        _free_port(self.port)
         cmd = [
             str(exe), "--model", _native_arg(base, exe),
             "--host", bind_host, "--port", str(self.port),
@@ -78,17 +115,19 @@ class LlamaServer:
             for line in self.process.stdout:
                 self.log.append(line)
         threading.Thread(target=_drain, daemon=True).start()
-        deadline = time.time() + 180
+        deadline = time.time() + timeout
         hosts = _health_hosts()
+        listening = False
         while time.time() < deadline:
+            joined = "".join(self.log[-80:])
+            if not listening and re.search(r"listening on http://", joined, re.I):
+                listening = True
+                # Model is up; spend the remaining window on reaching it from WSL.
+                deadline = max(deadline, time.time() + 90)
             for host in hosts:
-                try:
-                    with urlopen(f"http://{host}:{self.port}/health", timeout=2) as r:
-                        if r.status in (200, 204):
-                            self.client_host = host
-                            return
-                except Exception:
-                    pass
+                if _http_ok(host, self.port):
+                    self.client_host = host
+                    return
             time.sleep(1)
             if self.process.poll() is not None:
                 time.sleep(0.2)
@@ -101,6 +140,7 @@ class LlamaServer:
             self.process.terminate()
             try: self.process.wait(timeout=10)
             except subprocess.TimeoutExpired: self.process.kill()
+        _free_port(self.port)
 
 class OpenAIClient:
     def __init__(self, port: int, host: str = "127.0.0.1"): self.url = f"http://{host}:{port}/v1/chat/completions"
@@ -196,7 +236,16 @@ def run(models_path: Path, cases_path: Path, selected=None, output=None, on_even
         server=LlamaServer(cfg, model, port); model_result={"id":model["id"],"label":model["label"],"responses":[]}
         try:
             if on_event: on_event({"type":"model_start","model":model["id"]})
-            server.start(); client=OpenAIClient(port, server.client_host)
+            last_err = None
+            for attempt in range(2):
+                try:
+                    server.start(); last_err = None; break
+                except Exception as exc:
+                    last_err = exc
+                    server.stop()
+                    time.sleep(2)
+            if last_err: raise last_err
+            client=OpenAIClient(port, server.client_host)
             for case in cases:
                 if on_event: on_event({"type":"prompt","model":model["id"],"case":case["id"],"prompt":case["messages"][-1]["content"]})
                 try:
