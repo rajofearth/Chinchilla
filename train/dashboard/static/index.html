@@ -2,80 +2,843 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Mars Evaluation Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MARS · Checkpoint Evaluation</title>
 <style>
-body{font:14px system-ui;margin:0;background</head></style>:#0e1117;color:#e6edf3}header{padding:18px 28px;background:#161b22;display:flex;justify-content:space-between}main{padding:24px;max-width:1600px;margin:auto}.toolbar,.panel{background:#161b22;padding:16px;border-radius:8px;margin-top:18px}.toolbar{display:flex;gap:15px;align-items:center;flex-wrap:wrap}button{padding:9px 14px;border:0;border-radius:5px;background:#3578e5;color:#fff;cursor:pointer}select{background:#21262d;color:#fff;padding:8px;border:1px solid #444c56}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #30363d;text-align:left;vertical-align:top}th{color:#8b949e}.pass{color:#3fb950;font-weight:600}.fail{color:#f85149;font-weight:600}.muted{color:#8b949e}.bar{height:14px;background:#21262d;border-radius:4px;min-width:80px;margin:4px 0}.bar i{display:block;height:100%;background:#3578e5;border-radius:4px}.response{white-space:pre-wrap;max-width:650px;max-height:260px;overflow:auto}.history button{background:none;color:#58a6ff;padding:2px}
+:root{
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.175 0 0);
+  --card-2: oklch(0.155 0 0);
+  --primary: oklch(0.723 0.219 149.579);
+  --primary-dim: oklch(0.448 0.119 151.328);
+  --primary-foreground: oklch(0.982 0.018 155.826);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --faint: oklch(0.42 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --warn: oklch(0.795 0.161 82);
+  --base-color: oklch(0.65 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --border-soft: oklch(1 0 0 / 5%);
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  --sans: -apple-system, Inter, 'Segoe UI', system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--background);color:var(--foreground);font:12.5px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:oklch(1 0 0 / 14%)}
+::selection{background:var(--primary-dim);color:#fff}
+
+.shell{display:grid;grid-template-columns:1fr;grid-template-rows:40px auto 1fr 22px;height:100vh;grid-template-areas:"topbar" "runbar" "main" "statusbar"}
+.logo{width:22px;height:22px;background:var(--primary);color:#04150b;display:flex;align-items:center;justify-content:center;font:800 11px var(--mono);margin-right:10px;flex-shrink:0}
+
+.topbar{grid-area:topbar;display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--card-2);padding:0 14px}
+.crumb{font:11px var(--mono);color:var(--muted-foreground);display:flex;align-items:center;gap:6px}
+.crumb b{color:var(--foreground);font-weight:600}
+.sep{color:var(--faint)}
+.grow{flex:1}
+.tb-search{background:var(--card);border:1px solid var(--border);color:var(--foreground);font:11.5px var(--mono);padding:5px 10px;width:240px}
+.tb-search::placeholder{color:var(--faint)}
+.tb-item{display:flex;align-items:center;gap:6px;font:11px var(--mono);color:var(--muted-foreground);padding:0 12px;height:39px;border-left:1px solid var(--border-soft)}
+.dot{width:6px;height:6px;background:var(--primary);display:inline-block;box-shadow:0 0 0 3px oklch(0.723 0.219 149.579 / 15%)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px oklch(0.795 0.161 82 / 18%)}
+.dot.err{background:var(--destructive);box-shadow:0 0 0 3px oklch(0.704 0.191 22.216 / 18%)}
+.tb-avatar{width:24px;height:24px;background:var(--muted);display:flex;align-items:center;justify-content:center;font:10px var(--mono)}
+
+.runbar{grid-area:runbar;display:flex;flex-direction:column;gap:8px;background:var(--card-2);border-bottom:1px solid var(--border);padding:8px 14px;overflow:visible;z-index:2}
+.runbar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:30px}
+.run-label{font:10px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--faint);flex-shrink:0}
+.run-select,.model-chip input{accent-color:var(--primary)}
+.run-select{background:var(--card);border:1px solid var(--border);color:var(--foreground);font:11.5px var(--mono);padding:6px 10px;min-width:220px}
+.suite-info{display:flex;align-items:center;gap:14px;font:11px var(--mono);color:var(--muted-foreground);flex-wrap:wrap}
+.suite-info b{color:var(--foreground)}
+.model-picks{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
+.model-chip{display:flex;align-items:center;gap:5px;font:10.5px var(--mono);color:var(--muted-foreground);border:1px solid var(--border);padding:4px 8px;background:var(--card);cursor:pointer;white-space:nowrap}
+.model-chip:has(input:checked){border-color:oklch(0.723 0.219 149.579 / 40%);color:var(--foreground)}
+#runBtn{flex-shrink:0;margin-left:auto}
+
+.statusbar{grid-area:statusbar;border-top:1px solid var(--border);background:var(--card-2);display:flex;align-items:center;padding:0 14px;gap:18px;font:10.5px var(--mono);color:var(--faint)}
+.statusbar b{color:var(--muted-foreground);font-weight:500}
+
+.main{grid-area:main;overflow:hidden;display:grid;grid-template-columns:300px minmax(0,1fr) 320px;grid-template-rows:auto minmax(220px,.9fr) minmax(180px,1.1fr);grid-template-areas:"kpi kpi kpi" "left charts right" "left grid right";gap:1px;background:var(--border)}
+.pane{background:var(--background);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+
+.kpi-wrap{grid-area:kpi;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--border)}
+.kpi{background:var(--card-2);padding:14px 18px;min-width:0}
+.k-label{font:9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:8px}
+.k-value{font:600 22px/1.15 var(--mono);letter-spacing:-.02em;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.k-value small{font-size:12px;color:var(--muted-foreground);font-weight:400}
+.k-meta{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:8px;font:11px var(--mono);color:var(--muted-foreground)}
+.k-meta b{color:var(--foreground);font-weight:600}
+.k-delta{font:10px var(--mono);margin-top:4px;color:var(--faint)}
+.k-delta.up,.up{color:var(--primary)} .k-delta.down,.down{color:var(--destructive)}
+
+.pane-head{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--card-2);flex-shrink:0}
+.pane-head h2{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);margin:0}
+.count{font:10px var(--mono);color:var(--faint);background:var(--muted);padding:1px 6px}
+.tabs{display:flex;gap:2px}
+.tab{font:10px var(--mono);padding:4px 9px;color:var(--faint);cursor:pointer;border:1px solid transparent}
+.tab.active{color:var(--primary);border-color:var(--border);background:var(--card)}
+.pane-body{flex:1;overflow:auto;min-height:0}
+
+.cand-row{display:grid;grid-template-columns:8px 1fr 72px;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border-soft);cursor:pointer}
+.cand-row:hover{background:var(--card)}
+.cand-row.selected{background:oklch(0.723 0.219 149.579 / 6%);border-left:2px solid var(--primary);padding-left:12px}
+.cand-row.base{background:var(--card-2)}
+.cand-status{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.cand-status.base{background:var(--base-color)}
+.cand-status.up{background:var(--primary)} .cand-status.down{background:var(--destructive)}
+.cand-name{font:11.5px var(--mono);display:flex;align-items:center;gap:6px}
+.badge-base{font:8.5px var(--mono);color:var(--base-color);border:1px solid var(--faint);padding:0 4px;letter-spacing:.05em}
+.cand-sub{font:9.5px var(--mono);color:var(--faint);margin-top:2px}
+.cand-rate{font:11px var(--mono);text-align:right}
+.cand-delta{font:9px var(--mono);text-align:right;margin-top:2px}
+.cand-delta.up{color:var(--primary)} .cand-delta.down{color:var(--destructive)} .cand-delta.flat{color:var(--faint)}
+
+.charts-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:1px;background:var(--border);flex:1;min-height:0}
+.charts-grid.hidden,.cost-wrap.hidden{display:none}
+.cost-wrap{flex:1;overflow:auto;min-height:0;background:var(--background)}
+.cost-note{padding:8px 14px;font:10px var(--mono);color:var(--faint);border-bottom:1px solid var(--border)}
+.chart-box{background:var(--background);padding:12px 14px;display:flex;flex-direction:column;min-width:0;overflow:auto}
+.chart-title{font:9.5px var(--mono);text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:10px}
+.legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.legend .li{display:flex;align-items:center;gap:5px;font:9.5px var(--mono);color:var(--muted-foreground)}
+.legend .sw{width:8px;height:8px}
+
+.heat-table{width:100%;border-collapse:collapse}
+.heat-table th{font:9px var(--mono);color:var(--faint);text-align:center;padding:4px;font-weight:500;white-space:nowrap}
+.heat-table th:first-child,.heat-table td:first-child{text-align:left;color:var(--muted-foreground)}
+.heat-table td{padding:0;text-align:center}
+.heat-table td:first-child{padding:5px 8px 5px 0;font:10px var(--mono);white-space:nowrap}
+.heat-cell{min-width:38px;height:26px;font:600 9.5px var(--mono);display:flex;align-items:center;justify-content:center;margin:1px;color:#04150b}
+
+table.results{width:100%;border-collapse:collapse}
+table.results thead th{position:sticky;top:0;background:var(--card-2);text-align:left;padding:7px 12px;font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--faint);border-bottom:1px solid var(--border);white-space:nowrap;z-index:1}
+table.results tbody td{padding:7px 12px;border-bottom:1px solid var(--border-soft);font:11.5px var(--mono);white-space:nowrap}
+table.results tbody tr{cursor:pointer}
+table.results tbody tr:hover{background:var(--card)}
+table.results tbody tr.active-row{background:oklch(0.723 0.219 149.579 / 7%)}
+.status-chip{display:inline-flex;align-items:center;gap:5px;font:700 9.5px var(--mono);letter-spacing:.03em;padding:2px 7px;border:1px solid transparent}
+.status-chip.pass{color:var(--primary);border-color:oklch(0.723 0.219 149.579 / 30%);background:oklch(0.723 0.219 149.579 / 8%)}
+.status-chip.fail{color:var(--destructive);border-color:oklch(0.704 0.191 22.216 / 30%);background:oklch(0.704 0.191 22.216 / 8%)}
+.status-chip.err,.status-chip.run{color:var(--warn);border-color:oklch(0.795 0.161 82 / 30%);background:oklch(0.795 0.161 82 / 8%)}
+.status-chip::before{content:'';width:4px;height:4px;background:currentColor}
+.num-cell{text-align:right}
+.trunc{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-foreground);font:11px var(--sans)}
+.regress-tag{font:9px var(--mono);color:var(--destructive);border:1px solid oklch(0.704 0.191 22.216 / 30%);padding:0 5px;margin-left:6px}
+.empty{padding:18px 14px;color:var(--faint);font:11.5px var(--mono)}
+
+.insp-block{padding:14px;border-bottom:1px solid var(--border)}
+.insp-label{font:9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:8px}
+.insp-title{font:13px var(--mono);margin-bottom:2px}
+.insp-sub{font:10.5px var(--mono);color:var(--faint)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 10px;font:11px var(--mono);margin-top:10px}
+.kv .k{color:var(--faint)} .kv .v{text-align:right}
+.insp-response{font:11px/1.6 var(--mono);color:var(--muted-foreground);background:var(--card-2);border:1px solid var(--border);padding:10px;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.gauge-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.gauge{flex:1;height:6px;background:var(--muted);position:relative}
+.gauge i{position:absolute;left:0;top:0;height:100%;background:var(--primary)}
+.gauge-val{font:10.5px var(--mono);width:56px;text-align:right}
+.btn{font:10.5px var(--mono);padding:7px 12px;border:1px solid var(--border);background:var(--card-2);color:var(--foreground);cursor:pointer;text-align:center}
+.btn:hover{border-color:oklch(1 0 0 / 20%);background:var(--muted)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary);font-weight:700}
+.btn-row{display:flex;gap:8px;padding:12px 14px}
+
+@media (max-width:1100px){
+  .main{grid-template-columns:240px minmax(0,1fr);grid-template-areas:"kpi kpi" "left charts" "left grid" "right right"}
+  .kpi-wrap{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:720px){
+  .tb-item,.suite-info{display:none}
+  .tb-search{width:140px}
+  .main{display:block;overflow:auto}
+  .pane{min-height:280px}
+  .kpi-wrap{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-<header><b>Mars Evaluation Dashboard</b><span id="status" class="muted">idle</span></header>
-<main>
-<section class="toolbar">
-<label>Models<br><select id="models" multiple size="4"></select></label>
-<button id="run">Run selected models</button><button id="refresh">Refresh history</button>
-<span class="muted">Each model loads once; each case is a fresh stateless OpenAI request.</span>
-</section>
-<section class="panel"><h2>Current run summary</h2><div id="summary" class="muted">No active run.</div><div id="charts"></div></section>
-<section class="panel"><h2>Live activity</h2><div id="live" class="muted">Prompt and streamed response will appear here.</div></section>
-<section class="panel"><h2>All test results</h2><table><thead><tr><th>Model</th><th>Case</th><th>Status</th><th>Pass</th><th>Timing</th><th>Tokens</th><th>Explanation / response</th></tr></thead><tbody id="results"></tbody></table></section>
-<section class="panel"><h2>Past runs</h2><div id="history" class="history muted">Loading...</div></section>
-</main>
+<div class="shell">
+  <div class="topbar">
+    <div class="logo">M</div>
+    <div class="crumb"><b>MARS</b><span class="sep">/</span>checkpoint-eval<span class="sep">/</span><b id="crumbRun">—</b></div>
+    <div class="grow"></div>
+    <input class="tb-search" id="filter" type="search" placeholder="⌘K  search cases, models…">
+    <div class="tb-item"><span class="dot" id="liveDot"></span><span id="liveLabel">IDLE</span></div>
+    <div class="tb-item">env: <b style="color:var(--foreground)">local</b></div>
+    <div class="tb-item"><div class="tb-avatar">YR</div></div>
+  </div>
+
+  <div class="runbar">
+    <div class="runbar-row">
+      <span class="run-label">History</span>
+      <select class="run-select" id="runSelect"><option value="">no runs yet</option></select>
+      <div class="suite-info">
+        <span>suite: <b>smoke_v1</b></span>
+        <span>cases: <b id="caseCount">—</b></span>
+        <span>candidates: <b id="candMeta">—</b></span>
+      </div>
+    </div>
+    <div class="runbar-row">
+      <span class="run-label">Models</span>
+      <div class="model-picks" id="modelPicks"></div>
+      <button class="btn primary" id="runBtn">▶ Run Suite</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="kpi-wrap">
+      <div class="kpi">
+        <div class="k-label">Best checkpoint</div>
+        <div class="k-value" id="kBest">—</div>
+        <div class="k-meta" id="kBestMeta"></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Quality</div>
+        <div class="k-value" id="kQuality">—</div>
+        <div class="k-meta" id="kQualityMeta"></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Suite cost</div>
+        <div class="k-value" id="kCost">—</div>
+        <div class="k-meta" id="kCostMeta"></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Token efficiency</div>
+        <div class="k-value" id="kEff">—</div>
+        <div class="k-meta" id="kEffMeta"></div>
+      </div>
+    </div>
+
+    <div class="pane" style="grid-area:left">
+      <div class="pane-head"><h2>Candidates</h2><span class="count" id="candCount">0</span></div>
+      <div class="pane-body" id="ladder"><div class="empty">Load a run to compare candidates.</div></div>
+      <div class="btn-row"><button class="btn" id="clearSel" style="flex:1">Clear selection</button></div>
+    </div>
+
+    <div class="pane" style="grid-area:charts">
+      <div class="pane-head">
+        <h2>Progression &amp; Cost</h2>
+        <div class="grow"></div>
+        <div class="tabs">
+          <span class="tab active" data-chart="coverage">Coverage</span>
+          <span class="tab" data-chart="cost">Suite cost</span>
+        </div>
+      </div>
+      <div class="charts-grid" id="coverageView">
+        <div class="chart-box">
+          <div class="chart-title">Pass rate — base → checkpoints</div>
+          <svg id="lineChart" width="100%" height="150" viewBox="0 0 480 150" preserveAspectRatio="none"></svg>
+          <div class="legend">
+            <div class="li"><span class="sw" style="background:oklch(0.65 0 0)"></span>base</div>
+            <div class="li"><span class="sw" style="background:oklch(0.723 0.219 149.579)"></span>checkpoint</div>
+          </div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Category × candidate — pass rate</div>
+          <div style="overflow:auto"><table class="heat-table" id="heatmap"></table></div>
+        </div>
+      </div>
+      <div class="cost-wrap hidden" id="costView">
+        <div class="cost-note">Token efficiency = passed cases ÷ generated tokens × 1000. Suite time is the sum of per-case latency. Older runs without server token counts estimate tokens from character length (÷4).</div>
+        <table class="results">
+          <thead><tr>
+            <th>Candidate</th>
+            <th class="num-cell">Passed</th>
+            <th class="num-cell">Suite tokens</th>
+            <th class="num-cell">Prompt</th>
+            <th class="num-cell">Suite time</th>
+            <th class="num-cell">Avg TTFT</th>
+            <th class="num-cell">Avg complete</th>
+            <th class="num-cell">Tok/s</th>
+            <th class="num-cell">Eff /1k</th>
+            <th class="num-cell">vs base</th>
+          </tr></thead>
+          <tbody id="costBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="pane" style="grid-area:grid">
+      <div class="pane-head">
+        <h2>Case Results</h2>
+        <span class="count" id="rowCount">0</span>
+        <div class="grow"></div>
+        <div class="tabs">
+          <span class="tab active" data-f="all">All</span>
+          <span class="tab" data-f="regress">Regressions vs base</span>
+          <span class="tab" data-f="fail">Failing</span>
+          <span class="tab" data-f="run">Live</span>
+        </div>
+      </div>
+      <div class="pane-body">
+        <table class="results">
+          <thead><tr>
+            <th>Candidate</th><th>Case ID</th><th>Category</th><th>Status</th>
+            <th class="num-cell">Latency</th><th class="num-cell">TTFT</th><th class="num-cell">Tokens</th><th class="num-cell">Tok/s</th><th>Summary</th>
+          </tr></thead>
+          <tbody id="results"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="pane" style="grid-area:right">
+      <div class="pane-head"><h2>Inspector</h2></div>
+      <div class="pane-body" id="inspector"></div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span>run_id: <b id="stRun">—</b></span>
+    <span>source: <b>evaluation API</b></span>
+    <span>past runs: <b id="stHistory">0</b></span>
+    <div class="grow"></div>
+    <span id="stStatus"><b style="color:var(--primary)">● idle</b></span>
+    <span id="clock"></span>
+  </div>
+</div>
+
 <script>
-const $ = (x) => document.querySelector(x);
-const models = $('#models'), results = $('#results'), live = $('#live'), summary = $('#summary');
-let rows = {};
-function esc(x) { return String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function addRow(model, caseId) {
-  const key = model + '|' + caseId;
-  if (rows[key]) return rows[key];
-  const tr = document.createElement('tr');
-  tr.innerHTML = `<td>${esc(model)}</td><td>${esc(caseId)}</td><td class="state">running</td><td class="score">—</td><td class="timing">—</td><td class="tokens">—</td><td class="response"></td>`;
-  results.append(tr); rows[key] = tr; return tr;
+const $ = s => document.querySelector(s);
+const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number.isFinite(n) ? n.toLocaleString() : '—';
+const pct = v => Number.isFinite(v) ? (v * 100).toFixed(1) + '%' : '—';
+const pp = v => Number.isFinite(v) ? ((v >= 0 ? '+' : '') + (v * 100).toFixed(1) + 'pp') : '—';
+const categoryOf = id => String(id || '').split('.')[0] || 'other';
+function fmtMs(ms) {
+  if (!Number.isFinite(ms)) return '—';
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000);
+  return m + 'm ' + s + 's';
 }
-function finish(x) {
-  const tr = addRow(x.model, x.case);
-  tr.querySelector('.state').textContent = 'completed';
-  tr.querySelector('.score').innerHTML = x.score.pass ? '<span class="pass">PASS</span>' : '<span class="fail">FAIL</span>';
-  const m = x.metrics || {};
-  tr.querySelector('.timing').textContent = `${m.elapsed_ms ?? '—'} ms / TTFT ${m.ttft_ms ?? '—'} ms / ${m.tok_per_sec ?? '—'} tok/s`;
-  tr.querySelector('.tokens').textContent = `in ${m.prompt_tokens ?? '—'} / out ${m.completion_tokens ?? '—'}`;
-  tr.querySelector('.response').textContent = (x.score.explanation || '') + '\n' + x.response;
+function mean(arr) {
+  const xs = arr.filter(Number.isFinite);
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN;
 }
-async function refresh() {
-  const h = await (await fetch('/api/runs')).json();
-  const target = $('#history'); target.textContent = '';
-  if (!h.runs.length) { target.textContent = 'No completed runs.'; return; }
-  for (const r of h.runs) {
-    const div = document.createElement('div'), button = document.createElement('button');
-    button.textContent = r.run_id; button.onclick = () => loadRun(r.run_id);
-    div.append(button, ` ${r.models.join(', ')} — ${r.status}`); target.append(div);
+
+let rows = [];
+let candidates = [];
+let selectedCandidate = null;
+let selectedRow = null;
+let activeFilter = 'all';
+let eventSource = null;
+let availableModels = [];
+let historyCount = 0;
+
+function timingsOf(raw) {
+  const events = raw.events || [];
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i]?.timings) return events[i].timings;
   }
+  return {};
 }
-async function run() {
-  results.innerHTML = ''; rows = {}; $('#status').textContent = 'running';
-  const selected = [...models.selectedOptions].map(x => x.value);
-  const response = await fetch('/api/runs', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({models:selected})});
-  const started = await response.json(), events = new EventSource(started.events_url);
-  events.onmessage = (event) => {
-    const x = JSON.parse(event.data);
-    if (x.type === 'prompt') { addRow(x.model,x.case).querySelector('.response').textContent='PROMPT: '+x.prompt; live.textContent=x.model+' / '+x.case+'\n'+x.prompt; }
-    if (x.type === 'delta') { const tr=addRow(x.model,x.case); tr.querySelector('.response').textContent += x.text; live.textContent=x.model+' / '+x.case+'\n'+tr.querySelector('.response').textContent; }
-    if (x.type === 'finished') finish(x);
-    if (x.type === 'case_error') { const tr=addRow(x.model,x.case); tr.querySelector('.state').textContent='error'; tr.querySelector('.state').className='fail'; tr.querySelector('.response').textContent=x.error; }
-    if (x.type === 'run_finished') { $('#status').textContent='finished'; events.close(); refresh(); loadRun(started.run_id); }
+
+function normalizeRow(model, raw, status) {
+  const t = timingsOf(raw);
+  const m = raw.metrics || {};
+  const pass = raw.score?.pass;
+  const chars = raw.chars ?? m.chars ?? String(raw.text || raw.response || '').length;
+  const counted = raw.completion_tokens ?? m.completion_tokens ?? t.predicted_n;
+  const estimated = counted == null && chars ? Math.max(1, Math.round(chars / 4)) : null;
+  const tokens = counted ?? estimated;
+  const gen = raw.generation_ms ?? m.generation_ms;
+  const toks = Number(
+    raw.tok_per_sec ?? m.tok_per_sec ?? t.predicted_per_second ??
+    (Number.isFinite(tokens) && gen > 0 ? tokens / (gen / 1000) : NaN)
+  );
+  return {
+    cand: model.id,
+    clabel: model.label || model.id,
+    isBase: model.id === 'base',
+    case: raw.case_id || raw.case || '—',
+    category: categoryOf(raw.case_id || raw.case),
+    pass: pass == null ? null : !!pass,
+    err: status === 'error' || !!raw.error,
+    status: status || (raw.error ? 'error' : 'completed'),
+    latency: raw.elapsed_ms ?? m.elapsed_ms,
+    ttft: raw.ttft_ms ?? m.ttft_ms,
+    gen,
+    toks,
+    tokens,
+    tokensEstimated: counted == null && tokens != null,
+    promptTokens: raw.prompt_tokens ?? m.prompt_tokens ?? t.prompt_n,
+    text: raw.score?.explanation || raw.explanation || raw.text || raw.response || raw.error || '',
+    prompt: raw.prompt || '',
+    regression: false,
   };
 }
-async function loadRun(id) {
-  const d = await (await fetch('/api/runs/'+encodeURIComponent(id))).json();
-  results.innerHTML=''; rows={};
-  for (const m of d.models || []) for (const r of m.responses || []) finish({model:m.id,case:r.case_id,response:r.text||r.error||'',score:r.score||{pass:false,explanation:r.error||''},metrics:r});
-  const entries=Object.entries(d.summary||{});
-  summary.innerHTML='<table><tr><th>Model</th><th>Passed</th><th>Pass rate</th><th>Elapsed</th><th>Avg TTFT</th><th>Tokens</th><th>Tok/s</th></tr>'+entries.map(([id,s])=>`<tr><td>${esc(id)}</td><td>${s.passed}/${s.total}</td><td>${((s.pass_rate||0)*100).toFixed(1)}%</td><td>${s.elapsed_ms??'—'} ms</td><td>${s.avg_ttft_ms??'—'} ms</td><td>${s.prompt_tokens??'—'} in / ${s.completion_tokens??'—'} out</td><td>${s.tok_per_sec??'—'}</td></tr>`).join('')+'</table>';
-  const max=Math.max(1,...entries.map(([,s])=>s.tok_per_sec||0));
-  $('#charts').innerHTML='<h3></h3>Visual comparison</h3>'+entries.map(([id,s])=>`<div>${esc(id)} — pass ${((s.pass_rate||0)*100).toFixed(1)}%<div class="bar"><i style="width:${(s.pass_rate||0)*100}%"></i></div>speed ${s.tok_per_sec??'—'} tok/s<div class="bar"><i style="width:${((s.tok_per_sec||0)/max)*100}%"></i></div></div>`).join('<br>');
+
+function markRegressions() {
+  const basePass = new Map();
+  for (const r of rows) {
+    if (r.isBase && r.pass === true) basePass.set(r.case, true);
+  }
+  for (const r of rows) {
+    r.regression = !r.isBase && r.pass === false && basePass.get(r.case) === true;
+  }
 }
-$('#run').onclick=run; $('#refresh').onclick=refresh;
-(async function init(){ const m=await (await fetch('/api/models')).json(); models.innerHTML=m.models.map(x=>`<option value="${esc(x.id)}" selected>${esc(x.label)}</option>`).join(''); refresh(); })();
+
+function candidateStats() {
+  const by = new Map();
+  for (const r of rows) {
+    if (!by.has(r.cand)) by.set(r.cand, {
+      id: r.cand, label: r.clabel, isBase: r.isBase,
+      pass: 0, done: 0, toks: [], ttft: [], latency: [],
+      suiteMs: 0, genMs: 0, suiteTokens: 0, promptTokens: 0, estimated: false,
+    });
+    const s = by.get(r.cand);
+    if (r.pass != null) { s.done++; if (r.pass) s.pass++; }
+    if (Number.isFinite(r.toks)) s.toks.push(r.toks);
+    if (Number.isFinite(r.ttft)) s.ttft.push(r.ttft);
+    if (Number.isFinite(r.latency)) { s.latency.push(r.latency); s.suiteMs += r.latency; }
+    const gen = Number.isFinite(r.gen) ? r.gen : (Number.isFinite(r.latency) && Number.isFinite(r.ttft) ? Math.max(0, r.latency - r.ttft) : 0);
+    s.genMs += gen;
+    if (Number.isFinite(r.tokens)) s.suiteTokens += r.tokens;
+    if (Number.isFinite(r.promptTokens)) s.promptTokens += r.promptTokens;
+    if (r.tokensEstimated) s.estimated = true;
+  }
+  const list = [...by.values()].map(s => {
+    const rate = s.done ? s.pass / s.done : 0;
+    const efficiency = s.suiteTokens > 0 ? s.pass / s.suiteTokens * 1000 : NaN;
+    const derivedToks = s.suiteTokens > 0 && s.genMs > 0 ? s.suiteTokens / (s.genMs / 1000) : NaN;
+    return {
+      ...s,
+      rate,
+      meanToks: mean(s.toks) || derivedToks,
+      avgTtft: mean(s.ttft),
+      avgComplete: mean(s.latency),
+      efficiency,
+    };
+  });
+  const base = list.find(c => c.isBase);
+  for (const c of list) {
+    c.effVsBase = c.isBase || !base || !Number.isFinite(c.efficiency) || !Number.isFinite(base.efficiency) || !base.efficiency
+      ? null
+      : (c.efficiency / base.efficiency - 1);
+  }
+  list.sort((a, b) => Number(b.isBase) - Number(a.isBase) || a.id.localeCompare(b.id, undefined, {numeric: true}));
+  return list;
+}
+
+function setLive(state) {
+  const map = {
+    idle: ['IDLE', '', 'var(--primary)', '● idle'],
+    running: ['RUNNING', 'warn', 'var(--warn)', '● running suite'],
+    finished: ['FINISHED', '', 'var(--primary)', '● finished'],
+    error: ['ERROR', 'err', 'var(--destructive)', '● error'],
+    offline: ['OFFLINE', 'err', 'var(--destructive)', '● offline'],
+  };
+  const [label, cls, color, bar] = map[state] || map.idle;
+  $('#liveLabel').textContent = label;
+  $('#liveDot').className = 'dot' + (cls ? ' ' + cls : '');
+  $('#stStatus').innerHTML = `<b style="color:${color}">${bar}</b>`;
+}
+
+function currentRows() {
+  const q = $('#filter').value.trim().toLowerCase();
+  return rows.filter(r => {
+    if (selectedCandidate && r.cand !== selectedCandidate) return false;
+    if (activeFilter === 'fail' && r.pass !== false) return false;
+    if (activeFilter === 'regress' && !r.regression) return false;
+    if (activeFilter === 'run' && r.status !== 'running') return false;
+    if (!q) return true;
+    return [r.cand, r.clabel, r.case, r.category, r.text, r.status].join(' ').toLowerCase().includes(q);
+  });
+}
+
+function statusChip(r) {
+  if (r.err || r.status === 'error') return '<span class="status-chip err">ERROR</span>';
+  if (r.status === 'running') return '<span class="status-chip run">LIVE</span>';
+  if (r.pass == null) return '<span class="status-chip run">—</span>';
+  return r.pass ? '<span class="status-chip pass">PASS</span>' : '<span class="status-chip fail">FAIL</span>';
+}
+
+function renderLadder() {
+  candidates = candidateStats();
+  $('#candCount').textContent = candidates.length;
+  $('#candMeta').textContent = candidates.map(c => c.id).join(', ') || '—';
+  if (!candidates.length) {
+    $('#ladder').innerHTML = '<div class="empty">Load a run to compare candidates.</div>';
+    return;
+  }
+  const base = candidates.find(c => c.isBase) || candidates[0];
+  $('#ladder').innerHTML = candidates.map(c => {
+    const d = c.isBase ? null : (c.rate - base.rate);
+    const dir = d == null ? 'base' : d > 0.003 ? 'up' : d < -0.003 ? 'down' : 'flat';
+    const color = c.rate > 0.85 ? 'var(--primary)' : c.rate > 0.6 ? 'var(--warn)' : 'var(--destructive)';
+    return `<div class="cand-row ${c.isBase ? 'base' : ''} ${selectedCandidate === c.id ? 'selected' : ''}" data-cand="${esc(c.id)}">
+      <div class="cand-status ${dir}"></div>
+      <div>
+        <div class="cand-name">${esc(c.label)} ${c.isBase ? '<span class="badge-base">BASE</span>' : ''}</div>
+        <div class="cand-sub">${c.pass}/${c.done} · ${fmt(Math.round(c.suiteTokens))}${c.estimated ? '~' : ''} tok · ${fmtMs(c.suiteMs)}</div>
+      </div>
+      <div>
+        <div class="cand-rate" style="color:${color}">${pct(c.rate)}</div>
+        <div class="cand-delta ${dir}">${d == null ? '—' : pp(d)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.cand-row').forEach(el => {
+    el.onclick = () => {
+      selectedCandidate = selectedCandidate === el.dataset.cand ? null : el.dataset.cand;
+      renderLadder();
+      renderResults();
+      renderKPIs();
+    };
+  });
+}
+
+function renderLineChart() {
+  const list = candidates.length ? candidates : candidateStats();
+  const svg = $('#lineChart');
+  if (list.length < 1) { svg.innerHTML = ''; return; }
+  const w = 480, h = 150, pad = 28;
+  const rates = list.map(c => c.rate);
+  const min = Math.min(0, ...rates) - 0.05;
+  const max = Math.max(1, ...rates);
+  const span = Math.max(0.05, max - min);
+  const x = i => pad + (list.length === 1 ? (w - pad * 2) / 2 : i * ((w - pad * 2) / (list.length - 1)));
+  const y = v => h - pad - ((v - min) / span) * (h - pad * 1.6);
+  let grid = '';
+  for (let g = 0; g <= 3; g++) {
+    const gy = pad * 0.4 + g * ((h - pad * 1.6) / 3);
+    grid += `<line x1="${pad}" y1="${gy}" x2="${w - 8}" y2="${gy}" stroke="oklch(1 0 0 / 6%)"/>`;
+  }
+  const pts = rates.map((r, i) => `${x(i)},${y(r)}`).join(' ');
+  const dots = list.map((c, i) => {
+    const fill = c.isBase ? 'oklch(0.65 0 0)' : 'oklch(0.723 0.219 149.579)';
+    return `<circle cx="${x(i)}" cy="${y(c.rate)}" r="3.5" fill="${fill}" stroke="var(--background)" stroke-width="1.5"/>
+      <text x="${x(i)}" y="${y(c.rate) - 10}" fill="oklch(0.985 0 0)" font-family="ui-monospace,monospace" font-size="9.5" text-anchor="middle">${pct(c.rate)}</text>
+      <text x="${x(i)}" y="${h - 8}" fill="oklch(0.42 0 0)" font-family="ui-monospace,monospace" font-size="8.5" text-anchor="middle">${esc(c.id)}</text>`;
+  }).join('');
+  svg.innerHTML = `${grid}<polyline points="${pts}" fill="none" stroke="oklch(0.723 0.219 149.579)" stroke-width="1.8"/>${dots}`;
+}
+
+function heatColor(v) {
+  if (!Number.isFinite(v)) return 'oklch(0.25 0 0)';
+  const l = 0.28 + v * 0.42;
+  const c = 0.06 + v * 0.15;
+  return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${v > 0.55 ? 149.6 : 35})`;
+}
+
+function renderHeatmap() {
+  const list = candidates.length ? candidates : candidateStats();
+  const cats = [...new Set(rows.map(r => r.category))].sort();
+  if (!list.length || !cats.length) {
+    $('#heatmap').innerHTML = '<tr><td class="empty">No coverage yet.</td></tr>';
+    return;
+  }
+  const head = `<tr><th>category</th>${list.map(c => `<th>${esc(c.id)}</th>`).join('')}</tr>`;
+  const body = cats.map(cat => {
+    const cells = list.map(c => {
+      const subset = rows.filter(r => r.cand === c.id && r.category === cat && r.pass != null);
+      const v = subset.length ? subset.filter(r => r.pass).length / subset.length : NaN;
+      const label = Number.isFinite(v) ? Math.round(v * 100) : '—';
+      return `<td><div class="heat-cell" style="background:${heatColor(v)}">${label}</div></td>`;
+    }).join('');
+    return `<tr><td>${esc(cat)}</td>${cells}</tr>`;
+  }).join('');
+  $('#heatmap').innerHTML = head + body;
+}
+
+function renderResults() {
+  const data = currentRows();
+  $('#rowCount').textContent = data.length.toLocaleString();
+  if (!data.length) {
+    $('#results').innerHTML = '<tr><td colspan="9" class="empty">No matching results.</td></tr>';
+    return;
+  }
+  $('#results').innerHTML = data.map((r, idx) => `
+    <tr data-idx="${idx}" class="${selectedRow === r ? 'active-row' : ''}">
+      <td>${esc(r.clabel)}${r.isBase ? ' <span class="badge-base">BASE</span>' : ''}</td>
+      <td style="color:var(--muted-foreground)">${esc(r.case)}</td>
+      <td style="color:var(--faint)">${esc(r.category)}</td>
+      <td>${statusChip(r)}${r.regression ? '<span class="regress-tag">REGRESSION</span>' : ''}</td>
+      <td class="num-cell">${r.latency != null ? fmtMs(r.latency) : '—'}</td>
+      <td class="num-cell">${r.ttft != null ? fmtMs(r.ttft) : '—'}</td>
+      <td class="num-cell">${r.tokens != null ? fmt(r.tokens) + (r.tokensEstimated ? '~' : '') : '—'}</td>
+      <td class="num-cell">${Number.isFinite(r.toks) ? r.toks.toFixed(1) : '—'}</td>
+      <td class="trunc">${esc(r.text || '—')}</td>
+    </tr>`).join('');
+  document.querySelectorAll('#results tr[data-idx]').forEach(tr => {
+    tr.onclick = () => { selectedRow = data[Number(tr.dataset.idx)]; renderResults(); renderInspector(); };
+  });
+}
+
+function renderInspector() {
+  const r = selectedRow;
+  if (!r) {
+    $('#inspector').innerHTML = '<div class="insp-block"><div class="insp-label">No selection</div><div class="insp-sub">Select a case row to inspect timing, category, and the full response for that candidate.</div></div>';
+    return;
+  }
+  const peers = rows.filter(x => x.case === r.case);
+  const peerHtml = peers.map(p => `<div class="k">${esc(p.cand)}</div><div class="v">${p.pass == null ? '—' : (p.pass ? 'pass' : 'fail')}</div>`).join('');
+  const maxLat = Math.max(1, ...rows.map(x => x.latency || 0));
+  $('#inspector').innerHTML = `
+    <div class="insp-block">
+      <div class="insp-label">Case</div>
+      <div class="insp-title">${esc(r.case)}</div>
+      <div class="insp-sub">${esc(r.clabel)}${r.isBase ? ' (base)' : ''} · ${esc(r.category)}</div>
+      <div class="kv">
+        <div class="k">status</div><div class="v">${statusChip(r)}</div>
+        <div class="k">regression vs base</div><div class="v" style="color:${r.regression ? 'var(--destructive)' : 'var(--faint)'}">${r.regression ? 'yes' : 'no'}</div>
+        <div class="k">latency</div><div class="v">${r.latency != null ? fmtMs(r.latency) : '—'}</div>
+        <div class="k">ttft</div><div class="v">${r.ttft != null ? fmtMs(r.ttft) : '—'}</div>
+        <div class="k">throughput</div><div class="v">${Number.isFinite(r.toks) ? r.toks.toFixed(1) + ' tok/s' : '—'}</div>
+        <div class="k">completion tokens</div><div class="v">${r.tokens != null ? fmt(r.tokens) + (r.tokensEstimated ? ' (est.)' : '') : '—'}</div>
+        <div class="k">prompt tokens</div><div class="v">${r.promptTokens != null ? fmt(r.promptTokens) : '—'}</div>
+      </div>
+    </div>
+    <div class="insp-block">
+      <div class="insp-label">Same case across candidates</div>
+      <div class="kv">${peerHtml || '<div class="k">none</div><div class="v">—</div>'}</div>
+    </div>
+    <div class="insp-block">
+      <div class="insp-label">Latency vs run max</div>
+      <div class="gauge-row"><div class="gauge"><i style="width:${Math.min(100, (r.latency || 0) / maxLat * 100)}%"></i></div><div class="gauge-val">${r.latency != null ? r.latency + 'ms' : '—'}</div></div>
+    </div>
+    <div class="insp-block">
+      <div class="insp-label">Response / explanation</div>
+      <div class="insp-response">${esc(r.text || 'No response')}</div>
+    </div>
+    <div class="btn-row"><button class="btn" id="copyResp" style="flex:1">Copy response</button></div>`;
+  $('#copyResp').onclick = async () => {
+    try { await navigator.clipboard.writeText(r.text || ''); $('#copyResp').textContent = 'Copied'; }
+    catch { $('#copyResp').textContent = 'Copy failed'; }
+  };
+}
+
+function renderCostTable() {
+  const list = candidates.length ? candidates : candidateStats();
+  const body = $('#costBody');
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="10" class="empty">No suite cost data yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = list.map(c => {
+    const vs = c.effVsBase == null ? '—' : ((c.effVsBase >= 0 ? '+' : '') + (c.effVsBase * 100).toFixed(1) + '%');
+    const vsColor = c.effVsBase == null ? 'var(--faint)' : c.effVsBase >= 0 ? 'var(--primary)' : 'var(--destructive)';
+    return `<tr>
+      <td>${esc(c.label)}${c.isBase ? ' <span class="badge-base">BASE</span>' : ''}${c.estimated ? ' <span class="regress-tag" style="color:var(--warn);border-color:oklch(0.795 0.161 82 / 30%)">EST</span>' : ''}</td>
+      <td class="num-cell">${c.pass}/${c.done}</td>
+      <td class="num-cell">${fmt(Math.round(c.suiteTokens))}</td>
+      <td class="num-cell">${c.promptTokens ? fmt(Math.round(c.promptTokens)) : '—'}</td>
+      <td class="num-cell">${fmtMs(c.suiteMs)}</td>
+      <td class="num-cell">${fmtMs(c.avgTtft)}</td>
+      <td class="num-cell">${fmtMs(c.avgComplete)}</td>
+      <td class="num-cell">${Number.isFinite(c.meanToks) ? c.meanToks.toFixed(1) : '—'}</td>
+      <td class="num-cell">${Number.isFinite(c.efficiency) ? c.efficiency.toFixed(2) : '—'}</td>
+      <td class="num-cell" style="color:${vsColor}">${vs}</td>
+    </tr>`;
+  }).join('');
+}
+
+function focusCandidate() {
+  const list = candidates.length ? candidates : candidateStats();
+  if (selectedCandidate) return list.find(c => c.id === selectedCandidate) || list[0];
+  const ckpts = list.filter(c => !c.isBase);
+  return [...ckpts].sort((a, b) => b.rate - a.rate)[0] || list[0];
+}
+
+function renderKPIs() {
+  const list = candidateStats();
+  const ckpts = list.filter(c => !c.isBase);
+  const best = [...ckpts].sort((a, b) => b.rate - a.rate)[0] || list[0];
+  const base = list.find(c => c.isBase) || list[0];
+  if (!best) return;
+  const focus = focusCandidate() || best;
+  const idx = list.indexOf(best);
+  const prev = idx > 0 ? list[idx - 1] : base;
+  const dBase = best && base ? best.rate - base.rate : NaN;
+  const dPrev = best && prev ? best.rate - prev.rate : NaN;
+  const regress = rows.filter(r => r.regression).length;
+  $('#kBest').innerHTML = `${esc(best.id)} <small>${pct(best.rate)}</small>`;
+  $('#kBestMeta').innerHTML = `
+    <span class="${dBase >= 0 ? 'up' : 'down'}">${pp(dBase)} vs base</span>
+    <span class="${dPrev >= 0 ? 'up' : 'down'}">${pp(dPrev)} vs ${esc(prev?.id || 'prior')}</span>`;
+  $('#kQuality').innerHTML = `${regress} <small>regressions</small>`;
+  $('#kQualityMeta').innerHTML = `
+    <span><b>${fmt(rows.length)}</b> case rows</span>
+    <span><b>${focus.pass}/${focus.done}</b> ${esc(focus.id)}</span>
+    <span id="kHistory">past runs: ${historyCount}</span>`;
+  const tokLabel = focus.suiteTokens ? fmt(Math.round(focus.suiteTokens)) + (focus.estimated ? '~' : '') : '—';
+  $('#kCost').innerHTML = `${esc(tokLabel)} <small>tok</small>`;
+  $('#kCostMeta').innerHTML = `
+    <span><b>${fmtMs(focus.suiteMs)}</b> suite</span>
+    <span>ttft <b>${fmtMs(focus.avgTtft)}</b></span>
+    <span>complete <b>${fmtMs(focus.avgComplete)}</b></span>
+    <span><b>${Number.isFinite(focus.meanToks) ? focus.meanToks.toFixed(1) : '—'}</b> tok/s</span>
+    <span>${esc(focus.id)}</span>`;
+  const vs = focus.effVsBase == null ? '—' : ((focus.effVsBase >= 0 ? '+' : '') + (focus.effVsBase * 100).toFixed(1) + '%');
+  $('#kEff').innerHTML = `${Number.isFinite(focus.efficiency) ? focus.efficiency.toFixed(2) : '—'} <small>passes / 1k tok</small>`;
+  $('#kEffMeta').innerHTML = `<span class="${focus.effVsBase == null ? '' : focus.effVsBase >= 0 ? 'up' : 'down'}">${vs} vs base</span>`;
+}
+
+function refreshViews() {
+  markRegressions();
+  renderLadder();
+  renderLineChart();
+  renderHeatmap();
+  renderCostTable();
+  renderResults();
+  renderKPIs();
+  if (selectedRow) renderInspector();
+}
+
+function ingestRun(data) {
+  rows = [];
+  selectedRow = null;
+  for (const m of data.models || []) {
+    for (const r of m.responses || []) {
+      rows.push(normalizeRow(m, r, r.error ? 'error' : 'completed'));
+    }
+  }
+  const id = data.run_id || '—';
+  $('#crumbRun').textContent = id;
+  $('#stRun').textContent = id;
+  refreshViews();
+  renderInspector();
+}
+
+async function loadRun(id) {
+  if (!id) return;
+  const d = await (await fetch('/api/runs/' + encodeURIComponent(id))).json();
+  ingestRun(d);
+  $('#runSelect').value = id;
+}
+
+async function refresh() {
+  const [runs, models, cases] = await Promise.all([
+    fetch('/api/runs').then(r => r.json()),
+    fetch('/api/models').then(r => r.json()),
+    fetch('/api/cases').then(r => r.json()).catch(() => ({cases: []})),
+  ]);
+  availableModels = models.models || [];
+  $('#modelPicks').innerHTML = availableModels.map(m =>
+    `<label class="model-chip"><input type="checkbox" value="${esc(m.id)}" checked> ${esc(m.label || m.id)}</label>`
+  ).join('');
+  const hist = runs.runs || [];
+  historyCount = hist.length;
+  const stHist = $('#stHistory');
+  if (stHist) stHist.textContent = historyCount;
+  $('#caseCount').textContent = (cases.cases || []).length || '—';
+  $('#runSelect').innerHTML = hist.length
+    ? hist.map(r => `<option value="${esc(r.run_id)}">${esc(r.run_id)} — ${(r.models || []).join(', ') || 'run'}</option>`).join('')
+    : '<option value="">no runs yet</option>';
+  if (hist[0]) await loadRun(hist[0].run_id);
+}
+
+function upsertLive(partial) {
+  let r = rows.find(x => x.cand === partial.cand && x.case === partial.case);
+  if (!r) { r = partial; rows.push(r); }
+  else Object.assign(r, partial);
+  refreshViews();
+}
+
+async function runSuite() {
+  const selected = [...document.querySelectorAll('#modelPicks input:checked')].map(x => x.value);
+  if (!selected.length) return;
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  rows = []; selectedRow = null; selectedCandidate = null;
+  refreshViews();
+  setLive('running');
+  $('#runBtn').disabled = true;
+  try {
+    const d = await (await fetch('/api/runs', {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({models: selected}),
+    })).json();
+    $('#crumbRun').textContent = d.run_id;
+    $('#stRun').textContent = d.run_id;
+    eventSource = new EventSource(d.events_url);
+    eventSource.onmessage = e => {
+      const x = JSON.parse(e.data);
+      if (x.type === 'prompt') {
+        upsertLive({
+          cand: x.model, clabel: x.model, isBase: x.model === 'base',
+          case: x.case, category: categoryOf(x.case), pass: null, err: false,
+          status: 'running', latency: null, ttft: null, toks: NaN, tokens: null,
+          text: 'PROMPT: ' + (x.prompt || ''), regression: false,
+        });
+      } else if (x.type === 'delta') {
+        const r = rows.find(y => y.cand === x.model && y.case === x.case);
+        if (r) { r.text = (r.text || '') + (x.text || ''); r.status = 'running'; renderResults(); if (selectedRow === r) renderInspector(); }
+      } else if (x.type === 'finished') {
+        upsertLive(normalizeRow({id: x.model, label: x.model}, {
+          case_id: x.case, text: x.response, score: x.score, ...x.metrics, events: x.events,
+        }, 'completed'));
+      } else if (x.type === 'case_error') {
+        upsertLive({
+          cand: x.model, clabel: x.model, isBase: x.model === 'base',
+          case: x.case, category: categoryOf(x.case), pass: false, err: true,
+          status: 'error', text: x.error || 'error', regression: false,
+        });
+      } else if (x.type === 'run_finished') {
+        eventSource.close();
+        eventSource = null;
+        setLive('finished');
+        loadRun(d.run_id).then(() => refresh().catch(() => {}));
+      } else if (x.type === 'error') {
+        setLive('error');
+      }
+    };
+    eventSource.onerror = () => setLive('error');
+  } catch (err) {
+    console.error(err);
+    setLive('error');
+  } finally {
+    $('#runBtn').disabled = false;
+  }
+}
+
+$('#runBtn').onclick = runSuite;
+$('#clearSel').onclick = () => {
+  selectedCandidate = null;
+  selectedRow = null;
+  renderLadder();
+  renderResults();
+  renderKPIs();
+  renderInspector();
+};
+$('#filter').oninput = renderResults;
+$('#runSelect').onchange = () => loadRun($('#runSelect').value);
+document.querySelectorAll('.tab[data-f]').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab[data-f]').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    activeFilter = t.dataset.f;
+    renderResults();
+  };
+});
+document.querySelectorAll('.tab[data-chart]').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab[data-chart]').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const cost = t.dataset.chart === 'cost';
+    $('#coverageView').classList.toggle('hidden', cost);
+    $('#costView').classList.toggle('hidden', !cost);
+  };
+});
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    $('#filter').focus();
+    $('#filter').select();
+  }
+  if (e.key === 'Escape') $('#clearSel').click();
+});
+function tick() { $('#clock').textContent = new Date().toLocaleTimeString('en-US', {hour12: false}) + ' UTC'; }
+setInterval(tick, 1000); tick();
+renderInspector();
+refresh().catch(() => setLive('offline'));
 </script>
 </body>
 </html>

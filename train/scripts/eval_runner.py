@@ -107,11 +107,27 @@ def load_matrix(path: Path):
     return cfg, models
 
 def _totals(responses, total):
-    completed=[r for r in responses if r.get("status")=="completed"]; valid_tokens=[r for r in completed if r.get("completion_tokens") is not None]
-    elapsed=sum(r.get("elapsed_ms",0) for r in completed); generation=sum(r.get("generation_ms",0) for r in completed)
+    completed=[r for r in responses if r.get("status")=="completed"]
+    valid_tokens=[r for r in completed if r.get("completion_tokens") is not None]
+    passed=sum(bool(r.get("score",{}).get("pass")) for r in completed)
+    elapsed=sum(r.get("elapsed_ms",0) or 0 for r in completed)
+    generation=sum(r.get("generation_ms",0) or 0 for r in completed)
+    ttfts=[r["ttft_ms"] for r in completed if r.get("ttft_ms") is not None]
     completion=sum(r["completion_tokens"] for r in valid_tokens) if valid_tokens else None
     prompt=sum(r["prompt_tokens"] for r in completed if r.get("prompt_tokens") is not None) or None
-    return {"passed":sum(bool(r.get("score",{}).get("pass")) for r in completed),"completed":len(completed),"failed":total-len(completed),"total":total,"pass_rate":round(sum(bool(r.get("score",{}).get("pass")) for r in completed)/total,3) if total else 0,"elapsed_ms":elapsed,"generation_ms":generation,"avg_ttft_ms":round(sum(r["ttft_ms"] for r in completed if r.get("ttft_ms") is not None)/max(1,sum(r.get("ttft_ms") is not None for r in completed)),1),"prompt_tokens":prompt,"completion_tokens":completion,"total_tokens":(prompt+completion if prompt is not None and completion is not None else None),"tok_per_sec":round(completion/(generation/1000),3) if completion and generation else None,"token_coverage":len(valid_tokens)}
+    tok_per_sec=round(completion/(generation/1000),3) if completion and generation else None
+    # passes per 1k generated tokens: more correct answers per token spent
+    token_efficiency=round(passed / completion * 1000, 3) if completion else None
+    return {
+        "passed":passed,"completed":len(completed),"failed":total-len(completed),"total":total,
+        "pass_rate":round(passed/total,3) if total else 0,
+        "elapsed_ms":elapsed,"generation_ms":generation,
+        "avg_ttft_ms":round(sum(ttfts)/len(ttfts),1) if ttfts else None,
+        "avg_elapsed_ms":round(elapsed/len(completed),1) if completed else None,
+        "prompt_tokens":prompt,"completion_tokens":completion,
+        "total_tokens":(prompt+completion if prompt is not None and completion is not None else None),
+        "tok_per_sec":tok_per_sec,"token_efficiency":token_efficiency,"token_coverage":len(valid_tokens),
+    }
 
 def run(models_path: Path, cases_path: Path, selected=None, output=None, on_event=None):
     cfg, models = load_matrix(models_path); cases = json.loads(cases_path.read_text())["cases"]
@@ -128,7 +144,7 @@ def run(models_path: Path, cases_path: Path, selected=None, output=None, on_even
                 try:
                     got=client.stream(model["id"],case["messages"],{"temperature":cfg["server"].get("temperature",0.2),"seed":cfg["server"].get("seed",42),"max_tokens":cfg["server"].get("max_tokens",256)},lambda x: on_event({"type":"delta","model":model["id"],"case":case["id"],"text":x}) if on_event else None)
                     got["case_id"]=case["id"]; got["suite"]=case.get("suite"); got["prompt"]=case["messages"][-1]["content"]; got["expect"]=case.get("expect", {}); got["status"]="completed"; got["score"]=score(case,got["text"]); model_result["responses"].append(got)
-                    if on_event: on_event({"type":"finished","model":model["id"],"case":case["id"],"response":got["text"],"score":got["score"],"metrics":{k:got.get(k) for k in ("elapsed_ms","ttft_ms","generation_ms","prompt_tokens","completion_tokens","tok_per_sec")}})
+                    if on_event: on_event({"type":"finished","model":model["id"],"case":case["id"],"response":got["text"],"score":got["score"],"metrics":{k:got.get(k) for k in ("elapsed_ms","ttft_ms","generation_ms","prompt_tokens","completion_tokens","total_tokens","tok_per_sec","chars")}})
                 except Exception as exc:
                     error={"case_id":case["id"],"suite":case.get("suite"),"prompt":case["messages"][-1]["content"],"status":"error","error":str(exc)}; model_result["responses"].append(error)
                     if on_event: on_event({"type":"case_error","model":model["id"],"case":case["id"],"error":str(exc)})
