@@ -40,6 +40,9 @@ A Liquid Foundation Model finetune — targeting tool-use and agentic benchmarks
 | Training pipeline | [`train/`](train/) |
 | SFT configs | [`train/configs/`](train/configs/) |
 | Eval harness | [`train/evals/`](train/evals/) |
+| Realistic eval guide | [`train/evals/README.md`](train/evals/README.md) |
+
+The current evaluation is an offline, deterministic agent regression suite covering repository tool use, destructive-action safety, secret handling, prompt injection, uncertainty grounding, constrained output, practical Python generation, and source-grounded research. The default runner explicitly starts llama-server with reasoning enabled and an unrestricted reasoning budget; see the [evaluation guide](train/evals/README.md).
 
 > **Status:** In development. Pipeline scaffold lives under [`train/`](train/).
 

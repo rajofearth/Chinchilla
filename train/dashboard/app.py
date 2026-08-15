@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from eval_runner import run, ROOT, load_matrix
 
 app=FastAPI(title="Mars checkpoint evaluation")
-STATIC=Path(__file__).parent/"static"; RESULTS=ROOT/"evals"/"results"; MODELS=ROOT/"evals"/"models.yaml"; CASES=ROOT/"evals"/"cases"/"smoke_v1.json"
+STATIC=Path(__file__).parent/"static"; RESULTS=ROOT/"evals"/"results"; MODELS=ROOT/"evals"/"models.yaml"; CASES=ROOT/"evals"/"cases"/"agent_realistic_v1.json"
 runs: dict[str, asyncio.Queue] = {}
 class RunRequest(BaseModel):
     models: list[str] = Field(default_factory=lambda: ["base", "grpo-5400", "grpo-5500", "grpo-5600"])

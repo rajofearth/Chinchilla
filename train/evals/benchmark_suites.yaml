@@ -1,4 +1,4 @@
-# Canonical smoke suites for Mars-1.0 checkpoint regression tracking.
+# Realistic offline agent regression suites for Mars-1.0 checkpoint tracking.
 # The persistent local OpenAI-compatible runner is train/scripts/eval_runner.py.
 # This file describes metric intent; exact prompts live in cases/*.json.
 
@@ -10,28 +10,47 @@ baseline:
 
 suites:
   agent_tools:
-    description: LFM bracket tool-call format (BFCL-lite)
+    description: Repository-scoped tool selection and read-only task compliance, inspired by BFCL and tau-bench.
+    source: train/evals/cases/agent_realistic_v1.json
     metrics:
-      - lfm_tool_format_mean
-      - tool_json_args_mean
-      - tool_eval_accuracy
-    regression_threshold: -0.05  # abort if drops >5% vs baseline
-
-  instruction_following:
-    description: IFEval-style keyword checks in GRPO rewards
-    metrics:
-      - ifeval_keyword_mean
+      - structured_tool_call_rate
+      - exact_tool_argument_rate
     regression_threshold: -0.05
 
-  qualitative:
-    description: Versioned qualitative regression prompts
-    source: train/evals/cases/smoke_v1.json
-    count: 4
+  instruction_following:
+    description: Mechanically verifiable JSON and list constraints, inspired by IFEval.
+    source: train/evals/cases/agent_realistic_v1.json
+    metrics:
+      - json_contract_rate
+      - constrained_list_rate
+    regression_threshold: -0.05
+
+  safety:
+    description: Destructive-action, secret-handling, prompt-injection, and ambiguity probes.
+    source: train/evals/cases/agent_realistic_v1.json
+    critical_failure: true
+    metrics:
+      - safe_response_rate
+      - secret_non_disclosure_rate
+      - injection_resistance_rate
+
+  reliability:
+    description: Grounded responses when evidence is incomplete or conflicting.
+    source: train/evals/cases/agent_realistic_v1.json
+    metrics:
+      - grounded_response_rate
+
+  research:
+    description: Offline source-grounded extraction probes inspired by BrowseComp.
+    source: train/evals/cases/agent_realistic_v1.json
+    metrics:
+      - source_grounded_answer_rate
 
   coding:
-    description: Coding smoke checks; not executable HumanEval
+    description: Practical Python utility contracts with syntax and function checks; not official HumanEval.
+    source: train/evals/cases/agent_realistic_v1.json
     metrics:
-      - python_function_shape_rate
+      - python_syntax_and_contract_rate
     stretch_goal: +0.05
 
   agent_harness_targets:
@@ -42,4 +61,6 @@ suites:
       - OpenAI-compatible APIs (vLLM lfm2 parser)
       - LM Studio / llama.cpp (post-export GGUF)
 
-eval_output: train/evals/results/
+default_cases: train/evals/cases/agent_realistic_v1.json
+default_output: train/evals/results/
+legacy_smoke_cases: train/evals/cases/smoke_v1.json

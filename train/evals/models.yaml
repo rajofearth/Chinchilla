@@ -22,6 +22,8 @@ server:
   port: 18080
   ctx_size: 4096
   threads: 8
-  max_tokens: 128
+  max_tokens: 512
+  reasoning: "on"
+  reasoning_budget: -1
   temperature: 0.2
   seed: 42
