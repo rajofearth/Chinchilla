@@ -1,0 +1,22 @@
+{
+  "id": "8fac0956c9e6",
+  "model": "base",
+  "title": "New conversation",
+  "created_at": 1786805161.0359645,
+  "updated_at": 1786805531.1815784,
+  "messages": [
+    {
+      "role": "user",
+      "content": "write a python file to solve calculas problems, it should be able to take array of equeations but should be able to hanlde edge cases"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "",
+      "status": "error",
+      "started_at": 1786805164.5099804,
+      "error": "<urlopen error [Errno 111] Connection refused>",
+      "finished_at": 1786805531.1815727
+    }
+  ]
+}

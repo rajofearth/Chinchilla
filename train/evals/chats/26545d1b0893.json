@@ -1,0 +1,13 @@
+{
+  "id": "26545d1b0893",
+  "model": "base",
+  "title": "New conversation",
+  "created_at": 1786804664.8371935,
+  "updated_at": 1786804667.3270621,
+  "messages": [
+    {
+      "role": "user",
+      "content": "write a python file to solve calculas problems, it should be able to take array of equeations but should be able to hanlde edge cases"
+    }
+  ]
+}

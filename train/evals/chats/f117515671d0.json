@@ -1,0 +1,22 @@
+{
+  "id": "f117515671d0",
+  "model": "base",
+  "title": "New conversation",
+  "created_at": 1786805885.38316,
+  "updated_at": 1786806095.094038,
+  "messages": [
+    {
+      "role": "user",
+      "content": "hey"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "",
+      "status": "error",
+      "started_at": 1786805887.0279317,
+      "error": "<urlopen error [Errno 111] Connection refused>",
+      "finished_at": 1786806095.0940294
+    }
+  ]
+}

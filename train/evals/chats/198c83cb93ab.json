@@ -1,0 +1,42 @@
+{
+  "id": "198c83cb93ab",
+  "model": "base",
+  "title": "New conversation",
+  "created_at": 1786803712.1538985,
+  "updated_at": 1786805020.340444,
+  "messages": [
+    {
+      "role": "user",
+      "content": "write a python file to solve calculas problems, it should be able to take array of equeations but should be able to hanlde edge cases"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "",
+      "status": "error",
+      "started_at": 1786803764.8191047,
+      "error": "<urlopen error [Errno 111] Connection refused>",
+      "finished_at": 1786803965.3350017
+    },
+    {
+      "role": "user",
+      "content": "Reply with exactly: endpoint smoke passed"
+    },
+    {
+      "role": "assistant",
+      "content": "\nendpoint smoke passed",
+      "reasoning": "\nThe user says: \"write a python file to solve calculas problems, it should be able to take array of equations but should be able to handle edge cases. Reply with exactly: endpoint smoke passed\". They want a response that is exactly that phrase? Or they want a python file? The instruction: \"Reply with exactly: endpoint smoke passed\". That seems contradictory: they ask to write a python file, but then say \"Reply with exactly: endpoint smoke passed\". Possibly they want the phrase \"endpoint smoke passed\" as the reply. However, the instruction says \"write a python file to solve calculas problems...\". But then they add \"Reply with exactly: endpoint smoke passed\". This is ambiguous. Usually in these tasks, they want the phrase \"endpoint smoke passed\" as the final answer. However, the request is to write a python file. The instruction \"Reply with exactly: endpoint smoke passed\" might be a test to see if the assistant follows the last instruction. The last instruction is to reply with exactly that phrase. So we must obey that. The user explicitly says \"Reply with exactly: endpoint smoke passed\". So we must output exactly that phrase, no extra text. No code, no explanation. So answer: endpoint smoke passed\n\nThus final answer: endpoint smoke passed\n",
+      "status": "completed",
+      "started_at": 1786804833.2526574,
+      "elapsed_ms": 17433,
+      "ttft_ms": 3982,
+      "generation_ms": 13451,
+      "prompt_tokens": 56,
+      "completion_tokens": 273,
+      "total_tokens": 329,
+      "tok_per_sec": 20.296,
+      "token_source": "server_usage",
+      "finished_at": 1786805020.340444
+    }
+  ]
+}

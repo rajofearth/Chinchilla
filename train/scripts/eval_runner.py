@@ -150,7 +150,7 @@ class LlamaServer:
 
 class OpenAIClient:
     def __init__(self, port: int, host: str = "127.0.0.1"): self.url = f"http://{host}:{port}/v1/chat/completions"
-    def stream(self, model: str, messages: list[dict], generation: dict, on_delta=None):
+    def stream(self, model: str, messages: list[dict], generation: dict, on_delta=None, on_chunk=None):
         body = {"model": model, "messages": messages, "stream": True, "stream_options": {"include_usage": True}, **generation}
         req = Request(self.url, data=json.dumps(body).encode(), headers={"Content-Type":"application/json"}, method="POST")
         started = time.perf_counter(); first = None; text = ""; events=[]; usage = None; reasoning = ""
@@ -171,7 +171,9 @@ class OpenAIClient:
                     piece = delta.get("content") or ""
                     if (piece or reasoning_piece) and first is None: first = time.perf_counter()
                     text += piece
-                    if (piece or reasoning_piece) and on_delta: on_delta(piece or reasoning_piece)
+                    if piece and on_delta: on_delta(piece)
+                    if (piece or reasoning_piece) and on_chunk:
+                        on_chunk({"text": piece, "reasoning": reasoning_piece})
         elapsed = time.perf_counter() - started
         elapsed_ms = round(elapsed * 1000); ttft_ms = round((first-started)*1000) if first else None
         generation_ms = max(elapsed_ms - ttft_ms, 0) if ttft_ms is not None else elapsed_ms
